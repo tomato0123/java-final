@@ -1,5 +1,7 @@
 package ui;
 
+import config.ConfigManager;
+
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
@@ -15,6 +17,7 @@ import java.util.Random;
 public class PetPanel extends JPanel {
     private String currentState = "normal";
     private String bubbleText = "今天也要好好寫程式！";
+    private String currentPetType;
 
     private BufferedImage[] normalFrames = new BufferedImage[8];
     private BufferedImage[] happyFrames  = new BufferedImage[8];
@@ -29,12 +32,15 @@ public class PetPanel extends JPanel {
     private int initialClickX;
     private int initialClickY;
     private JFrame root;
-    private boolean isWanderingAllowed = true;
+    private boolean isWanderingAllowed;
+    private JPopupMenu popupMenu;
 
     public PetPanel(JFrame root) {
         this.root = root;
         setOpaque(false);
-        loadImages();
+        
+        reloadSettings();
+        setupPopupMenu();
 
         animationTimer = new Timer(150, new ActionListener() {
             @Override
@@ -61,13 +67,9 @@ public class PetPanel extends JPanel {
             }
             @Override
             public void mouseClicked(MouseEvent e) {
-                // 判斷是否為「按下滑鼠右鍵」
                 if (SwingUtilities.isRightMouseButton(e)) {
-                    setState("sleep", "Zzz... 系統閒置中...");
-                } 
-                // 否則就是「按下滑鼠左鍵」
-                else {
-                    // 如果現在是開心，就切回正常；反之則切換到開心
+                    popupMenu.show(e.getComponent(), e.getX(), e.getY());
+                } else {
                     if ("happy".equals(currentState)) {
                         setState("normal", "戳我幹嘛？快去讀書！");
                     } else {
@@ -80,17 +82,55 @@ public class PetPanel extends JPanel {
         addMouseMotionListener(dragAdapter);
     }
 
+    public void reloadSettings() {
+        this.currentPetType = ConfigManager.getPetType();
+        this.isWanderingAllowed = ConfigManager.isWanderAllowed();
+        loadImages();
+        repaint();
+    }
+
+    private void setupPopupMenu() {
+        popupMenu = new JPopupMenu();
+        JMenuItem dashboardItem = new JMenuItem("開啟控制面板");
+        JMenuItem sleepItem = new JMenuItem("進入休眠");
+        JMenuItem exitItem = new JMenuItem("關閉程式");
+
+        dashboardItem.addActionListener(e -> {
+            DashboardFrame dashboard = new DashboardFrame(this);
+            dashboard.setVisible(true);
+        });
+        
+        sleepItem.addActionListener(e -> setState("sleep", "Zzz... 系統閒置中..."));
+        exitItem.addActionListener(e -> System.exit(0));
+
+        popupMenu.add(dashboardItem);
+        popupMenu.add(sleepItem);
+        popupMenu.addSeparator();
+        popupMenu.add(exitItem);
+    }
+
+    private String getFolderName(String petType) {
+        switch (petType) {
+            case "blue":     return "blueSprite";
+            case "fire":     return "fireSprite";
+            case "water":    return "waterSprite";
+            default:         return petType; // baseball 資料夾名稱與 petType 相同
+        }
+    }
+
     private void loadImages() {
+        String folder = "resources/" + getFolderName(currentPetType) + "/";
+        String prefix = currentPetType + "-";
         try {
-            for(int i = 0; i < 8; i++) {
-                normalFrames[i]    = ImageIO.read(new File("resources/blue-normal" + (i+1) + ".png"));
-                happyFrames[i]     = ImageIO.read(new File("resources/blue-happy"  + (i+1) + ".png"));
-                sleepFrames[i]     = ImageIO.read(new File("resources/blue-sleep"  + (i+1) + ".png"));
-                walkRightFrames[i] = ImageIO.read(new File("resources/blue-walkR"  + (i+1) + ".png"));
-                walkLeftFrames[i]  = ImageIO.read(new File("resources/blue-walkL"  + (i+1) + ".png"));
+            for (int i = 0; i < 8; i++) {
+                normalFrames[i]    = ImageIO.read(new File(folder + prefix + "normal" + (i+1) + ".png"));
+                happyFrames[i]     = ImageIO.read(new File(folder + prefix + "happy"  + (i+1) + ".png"));
+                sleepFrames[i]     = ImageIO.read(new File(folder + prefix + "sleep"  + (i+1) + ".png"));
+                walkRightFrames[i] = ImageIO.read(new File(folder + prefix + "walkR"  + (i+1) + ".png"));
+                walkLeftFrames[i]  = ImageIO.read(new File(folder + prefix + "walkL"  + (i+1) + ".png"));
             }
         } catch (IOException e) {
-            System.err.println("Error: " + e.getMessage());
+            System.err.println("載入圖片失敗（" + currentPetType + "）: " + e.getMessage());
         }
     }
 
@@ -100,9 +140,7 @@ public class PetPanel extends JPanel {
             currentFrameIndex = 0;
         }
 
-        if ("happy".equals(currentState)) {
-            currentFrameIndex = (currentFrameIndex + 1) % 8;
-        } else if ("sleep".equals(currentState)) {
+        if ("happy".equals(currentState) || "sleep".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
         } else if ("normal".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
@@ -132,10 +170,6 @@ public class PetPanel extends JPanel {
         this.bubbleText = message;
         this.currentFrameIndex = 0;
         repaint();
-    }
-
-    public void toggleWandering() {
-        this.isWanderingAllowed = !this.isWanderingAllowed;
     }
 
     @Override
