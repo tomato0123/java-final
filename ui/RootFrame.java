@@ -1,5 +1,6 @@
 package ui;
 
+import config.BlacklistManager;
 import config.ReminderManager;
 import network.LocalServer;
 import network.WebHookHandler;
@@ -14,12 +15,13 @@ import java.io.IOException;
 public class RootFrame extends JFrame {
 
     // ── 核心元件 ──────────────────────────────────
-    private PetPanel        petPanel;
-    private ReminderManager reminderManager;
-    private WebHookHandler  webhookHandler;
-    private LocalServer     localServer;
-    private FocusDialog     focusDialog;
-    private boolean         isFocusActive = false;
+    private PetPanel         petPanel;
+    private ReminderManager  reminderManager;
+    private BlacklistManager blacklistManager;
+    private WebHookHandler   webhookHandler;
+    private LocalServer      localServer;
+    private FocusDialog      focusDialog;
+    private boolean          isFocusActive = false;
 
     // ── 透明淡出 ──────────────────────────────────
     private volatile float petOpacity      = 1.0f;
@@ -42,7 +44,8 @@ public class RootFrame extends JFrame {
         petPanel = new PetPanel(this);
         add(petPanel);
 
-        reminderManager = new ReminderManager(petPanel);
+        reminderManager  = new ReminderManager(petPanel);
+        blacklistManager = new BlacklistManager();
 
         setupTrayIcon();
 
@@ -218,12 +221,38 @@ public class RootFrame extends JFrame {
         this.localServer    = ls;
     }
 
-    public PetPanel         getPetPanel()         { return petPanel; }
-    public WebHookHandler   getWebhookHandler()   { return webhookHandler; }
-    public ReminderManager  getReminderManager()  { return reminderManager; }
-    public boolean          isFocusActive()       { return isFocusActive; }
+    public PetPanel          getPetPanel()          { return petPanel; }
+    public WebHookHandler    getWebhookHandler()    { return webhookHandler; }
+    public ReminderManager   getReminderManager()   { return reminderManager; }
+    public BlacklistManager  getBlacklistManager()  { return blacklistManager; }
+    public boolean           isFocusActive()        { return isFocusActive; }
 
     public void updatePetState(String state, String message) {
         petPanel.setState(state, message);
+    }
+
+    /** Stage 2 警告：嗶聲後將寵物移到螢幕中央 */
+    public void moveToCenter() {
+        setLocationRelativeTo(null);
+        setVisible(true);
+        toFront();
+        petPanel.setState("angry", "回來讀書！！");
+    }
+
+    /** Stage 3 懲罰：彈出警告並結束本次專注 */
+    public void triggerFocusFailed(String keyword) {
+        petOpacity = 1.0f;
+        petPanel.showAlert();
+        petPanel.setState("angry", "違規！專注失敗！");
+        JOptionPane.showMessageDialog(this,
+            "偵測到「" + keyword + "」超過 10 秒！\n本次專注已強制結束。",
+            "⚠ 專注失敗", JOptionPane.WARNING_MESSAGE);
+        if (isFocusActive) stopFocusSession();
+    }
+
+    /** 申請查資料豁免（學習模式） */
+    public void applyResearchMode(int minutes) {
+        blacklistManager.startResearchMode(minutes);
+        petPanel.setState("happy", "好，去查資料吧！" + minutes + " 分鐘後記得回來！");
     }
 }

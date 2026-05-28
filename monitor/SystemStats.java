@@ -1,4 +1,4 @@
-package java-final.monitor;
+package monitor;
 
 public class SystemStats {
     
