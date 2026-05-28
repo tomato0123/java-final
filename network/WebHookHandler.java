@@ -31,7 +31,7 @@ public class WebHookHandler implements HttpHandler {
             leaveExpiryTimer = new Timer(minutes * 60 * 1000 + 5000, e -> {
                 if (isOnLeave && System.currentTimeMillis() > leaveEndTime) {
                     isOnLeave = false;
-                    pet.setState("angry", "逾假未歸！嚴重扣血！！！");
+                    pet.triggerViolation("逾假未歸！嚴重扣血！！！");
                 }
                 ((Timer) e.getSource()).stop();
             });
@@ -89,9 +89,9 @@ public class WebHookHandler implements HttpHandler {
         } else if (isOnLeave && now > leaveEndTime) {
             isOnLeave = false;
             if (leaveExpiryTimer != null) leaveExpiryTimer.stop();
-            pet.setState("angry", "逾假未歸！嚴重扣血！！！");
+            pet.triggerViolation("逾假未歸！嚴重扣血！！！");
         } else {
-            pet.setState("angry", "抓到了！偷滑手機！扣血！");
+            pet.triggerViolation("抓到了！偷滑手機！扣血！");
         }
     }
 }

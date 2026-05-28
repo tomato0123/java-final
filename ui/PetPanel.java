@@ -16,29 +16,32 @@ import java.util.Random;
 
 public class PetPanel extends JPanel {
     private String currentState = "normal";
-    private String bubbleText = "今天也要好好寫程式！";
+    private String bubbleText   = "今天也要好好寫程式！";
     private String currentPetType;
 
-    private BufferedImage[] normalFrames = new BufferedImage[8];
-    private BufferedImage[] happyFrames  = new BufferedImage[8];
-    private BufferedImage[] sleepFrames  = new BufferedImage[8];
-    private BufferedImage[] walkRightFrames = new BufferedImage[8];
-    private BufferedImage[] walkLeftFrames  = new BufferedImage[8];
+    private BufferedImage[] normalFrames     = new BufferedImage[8];
+    private BufferedImage[] happyFrames      = new BufferedImage[8];
+    private BufferedImage[] sleepFrames      = new BufferedImage[8];
+    private BufferedImage[] walkRightFrames  = new BufferedImage[8];
+    private BufferedImage[] walkLeftFrames   = new BufferedImage[8];
 
-    private int currentFrameIndex = 0;
-    private Timer animationTimer;
-    private Random random = new Random();
+    private int     currentFrameIndex = 0;
+    private Timer   animationTimer;
+    private Random  random = new Random();
 
-    private int initialClickX;
-    private int initialClickY;
-    private RootFrame root;
-    private boolean isWanderingAllowed;
+    private int        initialClickX, initialClickY;
+    private RootFrame  root;
+    private boolean    isWanderingAllowed;
     private JPopupMenu popupMenu;
+
+    // ── 警告紅色疊層 ──
+    private boolean alertActive = false;
+    private Timer   alertTimer;
 
     public PetPanel(RootFrame root) {
         this.root = root;
         setOpaque(false);
-        
+
         reloadSettings();
         setupPopupMenu();
 
@@ -56,17 +59,18 @@ public class PetPanel extends JPanel {
             public void mousePressed(MouseEvent e) {
                 initialClickX = e.getX();
                 initialClickY = e.getY();
+                root.onPetActivity(); // 任何按下都算互動，恢復透明度
             }
             @Override
             public void mouseDragged(MouseEvent e) {
-                int thisX = root.getLocation().x;
-                int thisY = root.getLocation().y;
                 int xMoved = e.getX() - initialClickX;
                 int yMoved = e.getY() - initialClickY;
-                root.setLocation(thisX + xMoved, thisY + yMoved);
+                root.setLocation(root.getLocation().x + xMoved,
+                                 root.getLocation().y + yMoved);
             }
             @Override
             public void mouseClicked(MouseEvent e) {
+                root.onPetActivity();
                 if (SwingUtilities.isRightMouseButton(e)) {
                     popupMenu.show(e.getComponent(), e.getX(), e.getY());
                 } else {
@@ -82,21 +86,51 @@ public class PetPanel extends JPanel {
         addMouseMotionListener(dragAdapter);
     }
 
+    // ════════════════════════════════════════════
+    //  公開 API
+    // ════════════════════════════════════════════
+
+    /** 顯示 2.5 秒紅色警告疊層 */
+    public void showAlert() {
+        alertActive = true;
+        if (alertTimer != null) alertTimer.stop();
+        alertTimer = new Timer(2500, e -> {
+            alertActive = false;
+            repaint();
+            ((Timer) e.getSource()).stop();
+        });
+        alertTimer.start();
+        repaint();
+    }
+
+    /** 違規時使用：切換至 angry 狀態 + 觸發紅色警告 */
+    public void triggerViolation(String message) {
+        setState("angry", message);
+        root.triggerAlert();
+    }
+
+    public void setState(String state, String message) {
+        this.currentState     = state;
+        this.bubbleText       = message;
+        this.currentFrameIndex = 0;
+        repaint();
+    }
+
     public void reloadSettings() {
-        this.currentPetType = ConfigManager.getPetType();
+        this.currentPetType    = ConfigManager.getPetType();
         this.isWanderingAllowed = ConfigManager.isWanderAllowed();
         loadImages();
         repaint();
     }
 
+    // ════════════════════════════════════════════
+    //  彈出選單
+    // ════════════════════════════════════════════
     private void setupPopupMenu() {
         popupMenu = new JPopupMenu();
 
         JMenuItem dashboardItem = new JMenuItem("開啟控制面板");
-        dashboardItem.addActionListener(e -> {
-            DashboardFrame dashboard = new DashboardFrame(root);
-            dashboard.setVisible(true);
-        });
+        dashboardItem.addActionListener(e -> new DashboardFrame(root).setVisible(true));
 
         JMenuItem focusItem = new JMenuItem("開始專注");
         focusItem.addActionListener(e -> root.startFocusSession());
@@ -112,6 +146,9 @@ public class PetPanel extends JPanel {
         JMenuItem sleepItem = new JMenuItem("進入休眠");
         sleepItem.addActionListener(e -> setState("sleep", "Zzz... 系統閒置中..."));
 
+        JMenuItem trayItem = new JMenuItem("最小化到工作列");
+        trayItem.addActionListener(e -> root.hideToTray());
+
         JMenuItem exitItem = new JMenuItem("關閉程式");
         exitItem.addActionListener(e -> System.exit(0));
 
@@ -119,16 +156,20 @@ public class PetPanel extends JPanel {
         popupMenu.add(focusItem);
         popupMenu.add(leaveMenu);
         popupMenu.add(sleepItem);
+        popupMenu.add(trayItem);
         popupMenu.addSeparator();
         popupMenu.add(exitItem);
     }
 
+    // ════════════════════════════════════════════
+    //  圖片載入
+    // ════════════════════════════════════════════
     private String getFolderName(String petType) {
         switch (petType) {
-            case "blue":     return "blueSprite";
-            case "fire":     return "fireSprite";
-            case "water":    return "waterSprite";
-            default:         return petType; // baseball 資料夾名稱與 petType 相同
+            case "blue":  return "blueSprite";
+            case "fire":  return "fireSprite";
+            case "water": return "waterSprite";
+            default:      return petType;
         }
     }
 
@@ -148,9 +189,13 @@ public class PetPanel extends JPanel {
         }
     }
 
+    // ════════════════════════════════════════════
+    //  動畫邏輯
+    // ════════════════════════════════════════════
     private void updatePetBehavior() {
-        if (!isWanderingAllowed && (currentState.equals("walk_left") || currentState.equals("walk_right"))) {
-            currentState = "normal";
+        if (!isWanderingAllowed &&
+                (currentState.equals("walk_left") || currentState.equals("walk_right"))) {
+            currentState      = "normal";
             currentFrameIndex = 0;
         }
 
@@ -159,58 +204,49 @@ public class PetPanel extends JPanel {
         } else if ("normal".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
             if (isWanderingAllowed && random.nextInt(100) < 5) {
-                currentState = random.nextBoolean() ? "walk_left" : "walk_right";
+                currentState      = random.nextBoolean() ? "walk_left" : "walk_right";
                 currentFrameIndex = 0;
             }
         } else if ("walk_left".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
             root.setLocation(root.getLocation().x - 5, root.getLocation().y);
-            if (random.nextInt(100) < 5) {
-                currentState = "normal";
-                currentFrameIndex = 0;
-            }
+            if (random.nextInt(100) < 5) { currentState = "normal"; currentFrameIndex = 0; }
         } else if ("walk_right".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
             root.setLocation(root.getLocation().x + 5, root.getLocation().y);
-            if (random.nextInt(100) < 5) {
-                currentState = "normal";
-                currentFrameIndex = 0;
-            }
+            if (random.nextInt(100) < 5) { currentState = "normal"; currentFrameIndex = 0; }
         }
     }
 
-    public void setState(String state, String message) {
-        this.currentState = state;
-        this.bubbleText = message;
-        this.currentFrameIndex = 0;
-        repaint();
-    }
-
+    // ════════════════════════════════════════════
+    //  繪圖
+    // ════════════════════════════════════════════
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        BufferedImage currentImage = null;
+        // ── 套用淡出透明度 ──
+        float opacity = root.getPetOpacity();
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, opacity));
 
-        if ("normal".equals(currentState) && normalFrames[currentFrameIndex] != null) {
+        // ── 繪製角色圖片 ──
+        BufferedImage currentImage = null;
+        if      ("normal".equals(currentState)     && normalFrames[currentFrameIndex]    != null)
             currentImage = normalFrames[currentFrameIndex];
-        } else if ("happy".equals(currentState) && happyFrames[currentFrameIndex] != null) {
+        else if ("happy".equals(currentState)      && happyFrames[currentFrameIndex]     != null)
             currentImage = happyFrames[currentFrameIndex];
-        } else if ("sleep".equals(currentState) && sleepFrames[currentFrameIndex] != null) {
+        else if ("sleep".equals(currentState)      && sleepFrames[currentFrameIndex]     != null)
             currentImage = sleepFrames[currentFrameIndex];
-        } else if ("walk_left".equals(currentState) && walkLeftFrames[currentFrameIndex] != null) {
+        else if ("walk_left".equals(currentState)  && walkLeftFrames[currentFrameIndex]  != null)
             currentImage = walkLeftFrames[currentFrameIndex];
-        } else if ("walk_right".equals(currentState) && walkRightFrames[currentFrameIndex] != null) {
+        else if ("walk_right".equals(currentState) && walkRightFrames[currentFrameIndex] != null)
             currentImage = walkRightFrames[currentFrameIndex];
-        }
 
         if (currentImage != null) {
-            int imgWidth = currentImage.getWidth();
-            int imgHeight = currentImage.getHeight();
-            int drawX = (300 - imgWidth) / 2;
-            int drawY = 280 - imgHeight;
+            int drawX = (300 - currentImage.getWidth())  / 2;
+            int drawY = 280  - currentImage.getHeight();
             g2d.drawImage(currentImage, drawX, drawY, null);
         } else {
             g2d.setColor(Color.RED);
@@ -219,10 +255,19 @@ public class PetPanel extends JPanel {
             g2d.drawString("無素材", 130, 150);
         }
 
+        // ── 對話氣泡 ──
         g2d.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 16));
         g2d.setColor(new Color(255, 255, 255, 200));
         g2d.fillRoundRect(30, 40, 250, 40, 15, 15);
         g2d.setColor(Color.BLACK);
         g2d.drawString(bubbleText, 45, 65);
+
+        // ── 紅色警告疊層（恢復全不透明後疊加） ──
+        g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+        if (alertActive) {
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.45f));
+            g2d.setColor(new Color(220, 0, 0));
+            g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+        }
     }
 }

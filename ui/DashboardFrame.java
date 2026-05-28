@@ -6,71 +6,73 @@ import javax.swing.*;
 import java.awt.*;
 
 public class DashboardFrame extends JFrame {
-    private RootFrame root;
+    private final RootFrame root;
 
     public DashboardFrame(RootFrame root) {
         this.root = root;
 
         setTitle("系統控制面板");
-        setSize(400, 300);
+        setSize(480, 420);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
-        JTabbedPane tabbedPane = new JTabbedPane();
-        tabbedPane.addTab("寵物與外觀", createPetPanel());
-        tabbedPane.addTab("專注與連動", createFocusPanel());
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.addTab("寵物與外觀", createPetPanel());
+        tabs.addTab("專注與連動", createFocusPanel());
+        tabs.addTab("定時提醒",   new ReminderTab(root.getReminderManager()));
+        tabs.addTab("倒數計時",   new CountdownTab(root.getReminderManager()));
 
-        add(tabbedPane);
+        add(tabs);
     }
 
+    // ── 寵物與外觀 ────────────────────────────────
     private JPanel createPetPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(10, 10, 10, 10);
+        g.fill   = GridBagConstraints.HORIZONTAL;
 
-        gbc.gridx = 0; gbc.gridy = 0;
-        panel.add(new JLabel("寵物種類：", SwingConstants.RIGHT), gbc);
+        g.gridx = 0; g.gridy = 0;
+        panel.add(new JLabel("寵物種類：", SwingConstants.RIGHT), g);
+        JComboBox<String> petBox = new JComboBox<>(new String[]{"blue", "baseball"});
+        petBox.setSelectedItem(ConfigManager.getPetType());
+        g.gridx = 1;
+        panel.add(petBox, g);
 
-        String[] petOptions = {"blue", "baseball"};
-        JComboBox<String> petComboBox = new JComboBox<>(petOptions);
-        petComboBox.setSelectedItem(ConfigManager.getPetType());
-        gbc.gridx = 1;
-        panel.add(petComboBox, gbc);
+        g.gridx = 0; g.gridy = 1;
+        panel.add(new JLabel("隨機漫步：", SwingConstants.RIGHT), g);
+        JCheckBox wanderBox = new JCheckBox("允許寵物在桌面上走動");
+        wanderBox.setSelected(ConfigManager.isWanderAllowed());
+        g.gridx = 1;
+        panel.add(wanderBox, g);
 
-        gbc.gridx = 0; gbc.gridy = 1;
-        panel.add(new JLabel("隨機漫步：", SwingConstants.RIGHT), gbc);
-
-        JCheckBox wanderCheckBox = new JCheckBox("允許寵物在桌面上走動");
-        wanderCheckBox.setSelected(ConfigManager.isWanderAllowed());
-        gbc.gridx = 1;
-        panel.add(wanderCheckBox, gbc);
-
-        JButton saveButton = new JButton("儲存並套用");
-        saveButton.addActionListener(e -> {
-            ConfigManager.setPetType((String) petComboBox.getSelectedItem());
-            ConfigManager.setWanderAllowed(wanderCheckBox.isSelected());
+        JButton saveBtn = new JButton("儲存並套用");
+        saveBtn.addActionListener(e -> {
+            ConfigManager.setPetType((String) petBox.getSelectedItem());
+            ConfigManager.setWanderAllowed(wanderBox.isSelected());
             root.getPetPanel().reloadSettings();
             JOptionPane.showMessageDialog(this, "設定已更新！");
         });
-        gbc.gridx = 1; gbc.gridy = 2;
-        panel.add(saveButton, gbc);
+        g.gridx = 1; g.gridy = 2;
+        panel.add(saveBtn, g);
 
         return panel;
     }
 
+    // ── 專注與連動 ────────────────────────────────
     private JPanel createFocusPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(6, 6, 6, 6);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridwidth = 2;
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(6, 6, 6, 6);
+        g.fill   = GridBagConstraints.HORIZONTAL;
+        g.gridwidth = 2;
 
-        JLabel desc = new JLabel("<html><center>啟動後會開啟本地伺服器並顯示 QR Code，<br>用手機掃描即可開始監控。</center></html>",
-                SwingConstants.CENTER);
-        gbc.gridx = 0; gbc.gridy = 0;
-        panel.add(desc, gbc);
+        JLabel desc = new JLabel(
+            "<html><center>啟動後會開啟本地伺服器並顯示 QR Code，<br>用手機掃描即可開始監控。</center></html>",
+            SwingConstants.CENTER);
+        g.gridx = 0; g.gridy = 0;
+        panel.add(desc, g);
 
         JButton focusBtn = new JButton(root.isFocusActive() ? "⏸ 結束專注" : "▶ 開始專注");
         focusBtn.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
@@ -83,22 +85,20 @@ public class DashboardFrame extends JFrame {
                 focusBtn.setText("⏸ 結束專注");
             }
         });
-        gbc.gridy = 1;
-        panel.add(focusBtn, gbc);
+        g.gridy = 1;
+        panel.add(focusBtn, g);
 
-        gbc.gridwidth = 1;
-        gbc.gridy = 2; gbc.gridx = 0;
-        panel.add(new JLabel("申請請假：", SwingConstants.RIGHT), gbc);
-
-        JPanel leavePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        g.gridwidth = 1; g.gridx = 0; g.gridy = 2;
+        panel.add(new JLabel("申請請假：", SwingConstants.RIGHT), g);
+        JPanel leaveRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
         for (int min : new int[]{1, 3, 5, 10}) {
-            JButton btn = new JButton(min + " 分");
+            JButton b = new JButton(min + " 分");
             final int m = min;
-            btn.addActionListener(e -> root.applyForLeave(m));
-            leavePanel.add(btn);
+            b.addActionListener(e -> root.applyForLeave(m));
+            leaveRow.add(b);
         }
-        gbc.gridx = 1;
-        panel.add(leavePanel, gbc);
+        g.gridx = 1;
+        panel.add(leaveRow, g);
 
         return panel;
     }

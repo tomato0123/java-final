@@ -34,9 +34,27 @@ public class FocusDialog extends JDialog {
         JPanel panel = new JPanel(new BorderLayout(6, 6));
         panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 6, 14));
 
+        JPanel northPanel = new JPanel(new BorderLayout(0, 6));
+
         JLabel title = new JLabel("用手機掃描 QR Code 開始監控", SwingConstants.CENTER);
         title.setFont(new Font("Microsoft JhengHei", Font.BOLD, 14));
-        panel.add(title, BorderLayout.NORTH);
+        northPanel.add(title, BorderLayout.NORTH);
+
+        JLabel hint = new JLabel(
+            "<html><div style='text-align:center; padding:4px 6px;'>" +
+            "⚠ 手機與電腦必須連接<b>同一個 WiFi</b>，掃描後才能連線！" +
+            "</div></html>",
+            SwingConstants.CENTER);
+        hint.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        hint.setForeground(new Color(140, 80, 0));
+        hint.setOpaque(true);
+        hint.setBackground(new Color(255, 243, 205));
+        hint.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(220, 180, 80)),
+            BorderFactory.createEmptyBorder(4, 8, 4, 8)));
+        northPanel.add(hint, BorderLayout.SOUTH);
+
+        panel.add(northPanel, BorderLayout.NORTH);
 
         JLabel qrLabel = new JLabel("載入 QR Code 中...", SwingConstants.CENTER);
         qrLabel.setPreferredSize(new Dimension(220, 220));
