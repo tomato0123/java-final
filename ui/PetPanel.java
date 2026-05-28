@@ -143,6 +143,14 @@ public class PetPanel extends JPanel {
             leaveMenu.add(item);
         }
 
+        JMenu researchMenu = new JMenu("申請查資料");
+        for (int min : new int[]{1, 3, 5, 10}) {
+            final int m = min;
+            JMenuItem item = new JMenuItem(m + " 分鐘");
+            item.addActionListener(e -> root.applyResearchMode(m));
+            researchMenu.add(item);
+        }
+
         JMenuItem sleepItem = new JMenuItem("進入休眠");
         sleepItem.addActionListener(e -> setState("sleep", "Zzz... 系統閒置中..."));
 
@@ -155,6 +163,7 @@ public class PetPanel extends JPanel {
         popupMenu.add(dashboardItem);
         popupMenu.add(focusItem);
         popupMenu.add(leaveMenu);
+        popupMenu.add(researchMenu);
         popupMenu.add(sleepItem);
         popupMenu.add(trayItem);
         popupMenu.addSeparator();

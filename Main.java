@@ -15,7 +15,7 @@ public class Main {
 
             // 系統監控執行緒
             JnaMonitor monitor = new JnaMonitor(root);
-            new Thread(monitor, "JNA-Monitor").start();
+            monitor.start();
 
             // 網路元件（不在這裡啟動伺服器，按「開始專注」時才啟動）
             WebHookHandler webhookHandler = new WebHookHandler(root.getPetPanel());

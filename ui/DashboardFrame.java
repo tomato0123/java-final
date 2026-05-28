@@ -21,6 +21,7 @@ public class DashboardFrame extends JFrame {
         tabs.addTab("專注與連動", createFocusPanel());
         tabs.addTab("定時提醒",   new ReminderTab(root.getReminderManager()));
         tabs.addTab("倒數計時",   new CountdownTab(root.getReminderManager()));
+        tabs.addTab("黑名單設定", new BlacklistTab(root.getBlacklistManager()));
 
         add(tabs);
     }

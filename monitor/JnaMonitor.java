@@ -1,40 +1,81 @@
 package monitor;
 
+import config.BlacklistManager;
 import ui.RootFrame;
+import ui.ToastNotification;
 
-public class JnaMonitor implements Runnable {
-    private RootFrame root;
-    private boolean isRunning = true;
+import javax.swing.*;
+import java.awt.*;
+
+/**
+ * 漸進式違規警告：
+ *   Stage 1 (@2s)  — 寵物憤怒 + Toast 通知
+ *   Stage 2 (@5s)  — 系統嗶聲 + 寵物移到螢幕中央
+ *   Stage 3 (@10s) — 觸發「專注失敗」懲罰
+ * 非專注模式時只在 Stage 1 提醒。
+ */
+public class JnaMonitor implements WindowMonitor.WindowTitleListener {
+
+    private final RootFrame     root;
+    private final WindowMonitor windowMonitor;
+
+    private int  warnStage       = 0;
+    private long distractionStart = 0;
 
     public JnaMonitor(RootFrame root) {
-        this.root = root;
+        this.root          = root;
+        this.windowMonitor = new WindowMonitor();
+        windowMonitor.addListener(this);
     }
 
+    public void start() { windowMonitor.start(); }
+    public void stop()  { windowMonitor.stop();  }
+
     @Override
-    public void run() {
-        System.out.println("系統監控模組已啟動...");
-        
-        while (isRunning) {
-            try {
-                // 每秒偵測一次
-                Thread.sleep(1000);
-                
-                // TODO: 這裡之後要換成真正的 JNA 程式碼去抓視窗標題
-                // String activeWindowTitle = JnaUtil.getActiveWindowTitle();
-                
-                // ［模擬測試］：假設有 5% 的機率模擬使用者打開了黑名單視窗
-                if (Math.random() < 0.05) {
-                    System.out.println("[監控通知] 偵測到使用者打開了分心軟體！");
-                    root.updatePetState("distracted", "電腦打開 Twitch");
-                }
-                
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+    public void onWindowTitle(String title) {
+        BlacklistManager bm = root.getBlacklistManager();
+        if (bm.isDistraction(title)) {
+            if (distractionStart == 0) distractionStart = System.currentTimeMillis();
+            long elapsed = System.currentTimeMillis() - distractionStart;
+            escalate(elapsed, bm.matchedKeyword(title));
+        } else {
+            resetWarning();
         }
     }
 
-    public void stopMonitoring() {
-        this.isRunning = false;
+    private void escalate(long elapsedMs, String keyword) {
+        boolean focusActive = root.isFocusActive();
+
+        if (focusActive && elapsedMs >= 10_000 && warnStage < 3) {
+            warnStage = 3;
+            SwingUtilities.invokeLater(() -> root.triggerFocusFailed(keyword));
+
+        } else if (focusActive && elapsedMs >= 5_000 && warnStage < 2) {
+            warnStage = 2;
+            Toolkit.getDefaultToolkit().beep();
+            SwingUtilities.invokeLater(() -> root.moveToCenter());
+
+        } else if (elapsedMs >= 2_000 && warnStage < 1) {
+            warnStage = 1;
+            SwingUtilities.invokeLater(() -> {
+                root.triggerAlert();
+                root.getPetPanel().setState("angry", "偵測到分心軟體：" + keyword + "！");
+                ToastNotification.show(
+                    "⚠ 分心警告",
+                    "偵測到「" + keyword + "」，請回到學習！",
+                    () -> {},
+                    () -> {}
+                );
+            });
+        }
+    }
+
+    private void resetWarning() {
+        if (distractionStart != 0) {
+            warnStage        = 0;
+            distractionStart = 0;
+            SwingUtilities.invokeLater(() ->
+                root.getPetPanel().setState("normal", "很好！繼續保持專注！"));
+        }
     }
 }
