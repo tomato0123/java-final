@@ -31,11 +31,11 @@ public class PetPanel extends JPanel {
 
     private int initialClickX;
     private int initialClickY;
-    private JFrame root;
+    private RootFrame root;
     private boolean isWanderingAllowed;
     private JPopupMenu popupMenu;
 
-    public PetPanel(JFrame root) {
+    public PetPanel(RootFrame root) {
         this.root = root;
         setOpaque(false);
         
@@ -91,19 +91,33 @@ public class PetPanel extends JPanel {
 
     private void setupPopupMenu() {
         popupMenu = new JPopupMenu();
-        JMenuItem dashboardItem = new JMenuItem("開啟控制面板");
-        JMenuItem sleepItem = new JMenuItem("進入休眠");
-        JMenuItem exitItem = new JMenuItem("關閉程式");
 
+        JMenuItem dashboardItem = new JMenuItem("開啟控制面板");
         dashboardItem.addActionListener(e -> {
-            DashboardFrame dashboard = new DashboardFrame(this);
+            DashboardFrame dashboard = new DashboardFrame(root);
             dashboard.setVisible(true);
         });
-        
+
+        JMenuItem focusItem = new JMenuItem("開始專注");
+        focusItem.addActionListener(e -> root.startFocusSession());
+
+        JMenu leaveMenu = new JMenu("申請請假");
+        for (int min : new int[]{1, 3, 5, 10}) {
+            final int m = min;
+            JMenuItem item = new JMenuItem(m + " 分鐘");
+            item.addActionListener(e -> root.applyForLeave(m));
+            leaveMenu.add(item);
+        }
+
+        JMenuItem sleepItem = new JMenuItem("進入休眠");
         sleepItem.addActionListener(e -> setState("sleep", "Zzz... 系統閒置中..."));
+
+        JMenuItem exitItem = new JMenuItem("關閉程式");
         exitItem.addActionListener(e -> System.exit(0));
 
         popupMenu.add(dashboardItem);
+        popupMenu.add(focusItem);
+        popupMenu.add(leaveMenu);
         popupMenu.add(sleepItem);
         popupMenu.addSeparator();
         popupMenu.add(exitItem);

@@ -1,22 +1,26 @@
-import ui.RootFrame;
 import monitor.JnaMonitor;
 import network.LocalServer;
+import network.WebHookHandler;
+import ui.RootFrame;
+
+import javax.swing.*;
 
 public class Main {
     public static void main(String[] args) {
         System.out.println("專案啟動中...");
 
-        // 1. 啟動主 UI 視窗 (Root)
-        RootFrame root = new RootFrame();
-        root.setVisible(true);
+        SwingUtilities.invokeLater(() -> {
+            RootFrame root = new RootFrame();
+            root.setVisible(true);
 
-        // 2. 啟動系統監控執行緒（傳入 root 方便在偵測到分心時控制 UI）
-        JnaMonitor monitor = new JnaMonitor(root);
-        Thread monitorThread = new Thread(monitor);
-        monitorThread.start();
+            // 系統監控執行緒
+            JnaMonitor monitor = new JnaMonitor(root);
+            new Thread(monitor, "JNA-Monitor").start();
 
-        // 3. 啟動本地伺服器（傳入 root 方便在接收到手機訊號時控制 UI）
-        LocalServer server = new LocalServer(root);
-        server.startServer();
+            // 網路元件（不在這裡啟動伺服器，按「開始專注」時才啟動）
+            WebHookHandler webhookHandler = new WebHookHandler(root.getPetPanel());
+            LocalServer localServer = new LocalServer(webhookHandler);
+            root.setNetworkComponents(webhookHandler, localServer);
+        });
     }
 }
