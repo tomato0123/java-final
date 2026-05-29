@@ -4,6 +4,8 @@ import config.ConfigManager;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -73,6 +75,8 @@ public class PetPanel extends JPanel {
                 root.onPetActivity();
                 if (SwingUtilities.isRightMouseButton(e)) {
                     popupMenu.show(e.getComponent(), e.getX(), e.getY());
+                } else if (e.getClickCount() == 2) {
+                    root.hideToTray();
                 } else {
                     if ("happy".equals(currentState)) {
                         setState("normal", "戳我幹嘛？快去讀書！");
@@ -130,7 +134,7 @@ public class PetPanel extends JPanel {
         popupMenu = new JPopupMenu();
 
         JMenuItem dashboardItem = new JMenuItem("開啟控制面板");
-        dashboardItem.addActionListener(e -> new DashboardFrame(root).setVisible(true));
+        dashboardItem.addActionListener(e -> root.openDashboard());
 
         JMenuItem focusItem = new JMenuItem("開始專注");
         focusItem.addActionListener(e -> root.startFocusSession());
@@ -168,6 +172,19 @@ public class PetPanel extends JPanel {
         popupMenu.add(trayItem);
         popupMenu.addSeparator();
         popupMenu.add(exitItem);
+
+        // 彈出前動態調整可見性
+        popupMenu.addPopupMenuListener(new PopupMenuListener() {
+            @Override
+            public void popupMenuWillBecomeVisible(PopupMenuEvent e) {
+                boolean focusing = root.isFocusActive();
+                focusItem.setVisible(!focusing);
+                leaveMenu.setVisible(focusing);
+                researchMenu.setVisible(focusing);
+            }
+            @Override public void popupMenuWillBecomeInvisible(PopupMenuEvent e) {}
+            @Override public void popupMenuCanceled(PopupMenuEvent e) {}
+        });
     }
 
     // ════════════════════════════════════════════

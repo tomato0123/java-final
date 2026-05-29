@@ -20,7 +20,7 @@ public class RootFrame extends JFrame {
     private BlacklistManager blacklistManager;
     private WebHookHandler   webhookHandler;
     private LocalServer      localServer;
-    private FocusDialog      focusDialog;
+    private DashboardFrame   dashboardFrame;
     private boolean          isFocusActive = false;
 
     // ── 透明淡出 ──────────────────────────────────
@@ -66,27 +66,23 @@ public class RootFrame extends JFrame {
         trayIcon = new TrayIcon(icon, "桌面學習寵物");
         trayIcon.setImageAutoSize(true);
 
-        // 雙擊顯示主視窗
+        // 雙擊顯示，右鍵改用 Swing JPopupMenu（解決中文顯示亂碼問題）
         trayIcon.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) showFromTray();
             }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                if (e.isPopupTrigger())
+                    SwingUtilities.invokeLater(() -> showSwingTrayMenu());
+            }
+            @Override
+            public void mousePressed(MouseEvent e) {
+                if (e.isPopupTrigger())
+                    SwingUtilities.invokeLater(() -> showSwingTrayMenu());
+            }
         });
-
-        // 右鍵選單
-        PopupMenu popup = new PopupMenu();
-        MenuItem showItem = new MenuItem("顯示寵物");
-        showItem.addActionListener(e -> showFromTray());
-        MenuItem focusItem = new MenuItem("開始專注");
-        focusItem.addActionListener(e -> startFocusSession());
-        MenuItem exitItem = new MenuItem("關閉程式");
-        exitItem.addActionListener(e -> System.exit(0));
-        popup.add(showItem);
-        popup.add(focusItem);
-        popup.addSeparator();
-        popup.add(exitItem);
-        trayIcon.setPopupMenu(popup);
 
         try {
             SystemTray.getSystemTray().add(trayIcon);
@@ -110,6 +106,66 @@ public class RootFrame extends JFrame {
         g.drawArc(8, 14, 16, 10, 0, -180); // 笑臉
         g.dispose();
         return img;
+    }
+
+    /**
+     * 用全螢幕透明疊層 + Swing JPopupMenu 取代原生 AWT PopupMenu。
+     * 疊層 opacity=0.01f：使用者看不見，但 Windows 仍將任何點擊路由給它，
+     * 所以點擊選單外任何地方（含其他應用程式視窗）都會讓選單關閉。
+     */
+    private void showSwingTrayMenu() {
+        Point     p      = MouseInfo.getPointerInfo().getLocation();
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+
+        // 全螢幕疊層：幾乎不可見，但攔截所有外部點擊
+        JWindow overlay = new JWindow();
+        overlay.setAlwaysOnTop(true);
+        overlay.setBounds(0, 0, screen.width, screen.height);
+        try { overlay.setOpacity(0.01f); } catch (Exception ignored) {}
+
+        Font mf = new Font("Microsoft JhengHei", Font.PLAIN, 12);
+        JPopupMenu menu = new JPopupMenu();
+        menu.setLightWeightPopupEnabled(false); // 強制獨立視窗，確保浮在疊層上方
+
+        JMenuItem showItem = new JMenuItem("顯示寵物");
+        showItem.setFont(mf);
+        showItem.addActionListener(e -> { showFromTray();      overlay.dispose(); });
+
+        JMenuItem focusItem = new JMenuItem("開始專注");
+        focusItem.setFont(mf);
+        focusItem.addActionListener(e -> { startFocusSession(); overlay.dispose(); });
+
+        JMenuItem exitItem = new JMenuItem("關閉程式");
+        exitItem.setFont(mf);
+        exitItem.addActionListener(e -> System.exit(0));
+
+        menu.add(showItem);
+        menu.add(focusItem);
+        menu.addSeparator();
+        menu.add(exitItem);
+
+        // 點擊疊層（選單以外的任何地方）→ 關閉
+        overlay.addMouseListener(new MouseAdapter() {
+            @Override public void mousePressed(MouseEvent e) {
+                menu.setVisible(false);
+                overlay.dispose();
+            }
+        });
+
+        // 選單因其他原因關閉（點選項目 / Escape）→ 也關閉疊層
+        menu.addPopupMenuListener(new javax.swing.event.PopupMenuListener() {
+            @Override public void popupMenuWillBecomeVisible(javax.swing.event.PopupMenuEvent e) {}
+            @Override public void popupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent e) {
+                overlay.dispose();
+            }
+            @Override public void popupMenuCanceled(javax.swing.event.PopupMenuEvent e) {
+                overlay.dispose();
+            }
+        });
+
+        overlay.setVisible(true);
+        // p.x/p.y 是螢幕座標；疊層從 (0,0) 開始，所以直接用原值
+        menu.show(overlay, p.x, p.y);
     }
 
     public void hideToTray() {
@@ -181,17 +237,15 @@ public class RootFrame extends JFrame {
                 String url    = localServer.start();
                 petPanel.setState("normal", "專注模式啟動！加油！");
                 resetInactivityTimer();
-                focusDialog = new FocusDialog(this, url);
-                focusDialog.setVisible(true);
+                getOrCreateDashboard().onFocusStarted(url);
             } catch (IOException e) {
                 isFocusActive = false;
                 JOptionPane.showMessageDialog(this, "無法啟動伺服器：" + e.getMessage());
             }
         } else {
-            if (focusDialog != null && focusDialog.isDisplayable()) {
-                focusDialog.setVisible(true);
-                focusDialog.toFront();
-            }
+            DashboardFrame df = getOrCreateDashboard();
+            df.setVisible(true);
+            df.toFront();
         }
     }
 
@@ -201,8 +255,10 @@ public class RootFrame extends JFrame {
         if (fadeTimer       != null) fadeTimer.stop();
         petOpacity = 1.0f;
         petPanel.repaint();
-        if (webhookHandler != null) webhookHandler.cancelLeave();
-        if (localServer    != null) localServer.stop();
+        if (webhookHandler  != null) webhookHandler.cancelLeave();
+        if (localServer     != null) localServer.stop();
+        if (dashboardFrame  != null && dashboardFrame.isDisplayable())
+            dashboardFrame.onFocusStopped();
         petPanel.setState("normal", "專注結束！辛苦了！");
 
         // 3 秒後縮回工作列
@@ -226,6 +282,22 @@ public class RootFrame extends JFrame {
     public ReminderManager   getReminderManager()   { return reminderManager; }
     public BlacklistManager  getBlacklistManager()  { return blacklistManager; }
     public boolean           isFocusActive()        { return isFocusActive; }
+    public String            getCurrentFocusUrl()   { return localServer != null ? localServer.getLocalUrl() : null; }
+
+    /** 取得或建立控制面板（singleton，關閉後重建） */
+    public DashboardFrame getOrCreateDashboard() {
+        if (dashboardFrame == null || !dashboardFrame.isDisplayable()) {
+            dashboardFrame = new DashboardFrame(this);
+        }
+        return dashboardFrame;
+    }
+
+    /** 顯示控制面板並置前 */
+    public void openDashboard() {
+        DashboardFrame df = getOrCreateDashboard();
+        df.setVisible(true);
+        df.toFront();
+    }
 
     public void updatePetState(String state, String message) {
         petPanel.setState(state, message);

@@ -33,6 +33,10 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
 
     @Override
     public void onWindowTitle(String title) {
+        if (!root.isFocusActive()) {
+            resetWarning();
+            return;
+        }
         BlacklistManager bm = root.getBlacklistManager();
         if (bm.isDistraction(title)) {
             if (distractionStart == 0) distractionStart = System.currentTimeMillis();
