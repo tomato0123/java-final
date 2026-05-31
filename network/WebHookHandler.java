@@ -27,11 +27,11 @@ public class WebHookHandler implements HttpHandler {
             leaveEndTime = System.currentTimeMillis() + (minutes * 60 * 1000L);
             pet.setState("sleep", "准假 " + minutes + " 分鐘，快去快回！");
 
-            // 倒數結束後偵測是否逾假
-            leaveExpiryTimer = new Timer(minutes * 60 * 1000 + 5000, e -> {
-                if (isOnLeave && System.currentTimeMillis() > leaveEndTime) {
+            // 倒數結束後恢復專注狀態
+            leaveExpiryTimer = new Timer(minutes * 60 * 1000, e -> {
+                if (isOnLeave) {
                     isOnLeave = false;
-                    pet.triggerViolation("逾假未歸！嚴重扣血！！！");
+                    pet.setState("normal", "假期結束，繼續加油！");
                 }
                 ((Timer) e.getSource()).stop();
             });
@@ -55,6 +55,12 @@ public class WebHookHandler implements HttpHandler {
 
     public long getLeaveEndTime() {
         return leaveEndTime;
+    }
+
+    public String getStatusJson() {
+        boolean onLeave = isOnLeave && System.currentTimeMillis() < leaveEndTime;
+        long remaining  = onLeave ? leaveEndTime - System.currentTimeMillis() : 0;
+        return "{\"onLeave\":" + onLeave + ",\"remainingMs\":" + remaining + "}";
     }
 
     @Override

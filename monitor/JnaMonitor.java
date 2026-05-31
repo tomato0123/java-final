@@ -1,6 +1,7 @@
 package monitor;
 
 import config.BlacklistManager;
+import network.WebHookHandler;
 import ui.RootFrame;
 import ui.ToastNotification;
 
@@ -34,6 +35,11 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
     @Override
     public void onWindowTitle(String title) {
         if (!root.isFocusActive()) {
+            resetWarning();
+            return;
+        }
+        WebHookHandler wh = root.getWebhookHandler();
+        if (wh != null && wh.isOnLeave()) {
             resetWarning();
             return;
         }

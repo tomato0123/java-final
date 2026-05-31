@@ -30,6 +30,10 @@ public class RootFrame extends JFrame {
     private Timer inactivityTimer;
     private Timer fadeTimer;
 
+    // ── 定向走路 ──────────────────────────────────
+    private Point preMovePos = null;   // 走到中間之前的原始位置
+    private Timer moveTimer  = null;
+
     // ── 系統工作列 ────────────────────────────────
     private TrayIcon trayIcon;
 
@@ -253,6 +257,10 @@ public class RootFrame extends JFrame {
         isFocusActive = false;
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
+        // 中止走路動畫並復原位置
+        if (moveTimer != null) { moveTimer.stop(); moveTimer = null; }
+        petPanel.setDirectedWalk(false);
+        if (preMovePos != null) { setLocation(preMovePos); preMovePos = null; }
         petOpacity = 1.0f;
         petPanel.repaint();
         if (webhookHandler  != null) webhookHandler.cancelLeave();
@@ -303,16 +311,86 @@ public class RootFrame extends JFrame {
         petPanel.setState(state, message);
     }
 
-    /** Stage 2 警告：嗶聲後將寵物移到螢幕中央 */
+    /** Stage 2 警告：寵物跑到螢幕中央警告，結束後跑回原位 */
     public void moveToCenter() {
-        setLocationRelativeTo(null);
         setVisible(true);
         toFront();
-        petPanel.setState("angry", "回來讀書！！");
+        if (preMovePos == null) preMovePos = getLocation(); // 只記錄一次原始位置
+
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        Point center = new Point(screen.width / 2 - getWidth() / 2,
+                                 screen.height / 2 - getHeight() / 2);
+
+        walkToPosition(center, "找你來了！！", () -> {
+            petPanel.setState("angry", "回來讀書！！快！！");
+            Toolkit.getDefaultToolkit().beep();
+            // 停留 3 秒後跑回去
+            Timer stay = new Timer(3000, e -> {
+                returnToPreMovePos();
+                ((Timer) e.getSource()).stop();
+            });
+            stay.setRepeats(false);
+            stay.start();
+        });
+    }
+
+    /** 走回 moveToCenter 之前儲存的原始位置 */
+    private void returnToPreMovePos() {
+        if (preMovePos == null) return;
+        Point target = preMovePos;
+        walkToPosition(target, "我回去了！", () -> {
+            preMovePos = null;
+            petPanel.setState("normal", "繼續讀書！加油！");
+        });
+    }
+
+    /**
+     * 讓寵物以走路動畫斜線移動到目標位置。
+     * 每 40ms 移動一次，方向向量正規化後乘以速度，抵達後呼叫 onArrived。
+     */
+    private void walkToPosition(Point target, String msgWhileWalking, Runnable onArrived) {
+        if (moveTimer != null) { moveTimer.stop(); moveTimer = null; }
+
+        petPanel.setDirectedWalk(true);
+        final int SPEED = 9;
+        final String[] lastDir = {""};
+
+        moveTimer = new Timer(40, null);
+        moveTimer.addActionListener(e -> {
+            Point  cur  = getLocation();
+            double dx   = target.x - cur.x;
+            double dy   = target.y - cur.y;
+            double dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist <= SPEED) {
+                // 抵達目標
+                setLocation(target.x, target.y);
+                ((Timer) e.getSource()).stop();
+                moveTimer = null;
+                petPanel.setDirectedWalk(false);
+                SwingUtilities.invokeLater(() -> { if (onArrived != null) onArrived.run(); });
+            } else {
+                // 正規化方向向量，斜向移動
+                int moveX = (int)(SPEED * dx / dist);
+                int moveY = (int)(SPEED * dy / dist);
+
+                // 動畫方向依水平分量決定
+                String dir = dx < 0 ? "walk_left" : "walk_right";
+                if (!dir.equals(lastDir[0])) {
+                    petPanel.setState(dir, msgWhileWalking);
+                    lastDir[0] = dir;
+                }
+                setLocation(cur.x + moveX, cur.y + moveY);
+            }
+        });
+        moveTimer.start();
     }
 
     /** Stage 3 懲罰：彈出警告並結束本次專注 */
     public void triggerFocusFailed(String keyword) {
+        // 中止任何進行中的走路動畫
+        if (moveTimer != null) { moveTimer.stop(); moveTimer = null; }
+        petPanel.setDirectedWalk(false);
         petOpacity = 1.0f;
         petPanel.showAlert();
         petPanel.setState("angry", "違規！專注失敗！");

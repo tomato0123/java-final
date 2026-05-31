@@ -34,6 +34,7 @@ public class PetPanel extends JPanel {
     private int        initialClickX, initialClickY;
     private RootFrame  root;
     private boolean    isWanderingAllowed;
+    private boolean    directedWalk = false;  // 由 RootFrame 控制的定向移動模式
     private JPopupMenu popupMenu;
 
     // ── 警告紅色疊層 ──
@@ -119,6 +120,9 @@ public class PetPanel extends JPanel {
         this.currentFrameIndex = 0;
         repaint();
     }
+
+    /** 定向走模式：走路動畫播放，但停止隨機位移和隨機中止 */
+    public void setDirectedWalk(boolean on) { this.directedWalk = on; }
 
     public void reloadSettings() {
         this.currentPetType    = ConfigManager.getPetType();
@@ -235,12 +239,16 @@ public class PetPanel extends JPanel {
             }
         } else if ("walk_left".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
-            root.setLocation(root.getLocation().x - 5, root.getLocation().y);
-            if (random.nextInt(100) < 5) { currentState = "normal"; currentFrameIndex = 0; }
+            if (!directedWalk) {
+                root.setLocation(root.getLocation().x - 5, root.getLocation().y);
+                if (random.nextInt(100) < 5) { currentState = "normal"; currentFrameIndex = 0; }
+            }
         } else if ("walk_right".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
-            root.setLocation(root.getLocation().x + 5, root.getLocation().y);
-            if (random.nextInt(100) < 5) { currentState = "normal"; currentFrameIndex = 0; }
+            if (!directedWalk) {
+                root.setLocation(root.getLocation().x + 5, root.getLocation().y);
+                if (random.nextInt(100) < 5) { currentState = "normal"; currentFrameIndex = 0; }
+            }
         }
     }
 
