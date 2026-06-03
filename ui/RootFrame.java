@@ -3,6 +3,7 @@ package ui;
 import config.BlacklistManager;
 import config.FocusStatsManager;
 import config.ReminderManager;
+import config.TodoManager;
 import network.LocalServer;
 import network.WebHookHandler;
 
@@ -19,6 +20,7 @@ public class RootFrame extends JFrame {
     private PetPanel         petPanel;
     private ReminderManager  reminderManager;
     private BlacklistManager blacklistManager;
+    private TodoManager      todoManager;
     private WebHookHandler   webhookHandler;
     private LocalServer      localServer;
     private DashboardFrame   dashboardFrame;
@@ -26,6 +28,7 @@ public class RootFrame extends JFrame {
     private long              focusStartTime    = 0;
     private FocusStatsManager statsManager      = new FocusStatsManager();
     private boolean           phoneMonitorActive = false;
+    private String            currentFocusTask  = null; // null = no task selected
 
     // ── 透明淡出 ──────────────────────────────────
     private volatile float petOpacity      = 1.0f;
@@ -33,6 +36,10 @@ public class RootFrame extends JFrame {
     private static final int   IDLE_MS     = 30_000;  // 30 秒無互動後開始淡出
     private Timer inactivityTimer;
     private Timer fadeTimer;
+
+    // ── 定向走路 ──────────────────────────────────
+    private Point preMovePos = null;   // 走到中間之前的原始位置
+    private Timer moveTimer  = null;
 
     // ── 系統工作列 ────────────────────────────────
     private TrayIcon trayIcon;
@@ -50,6 +57,7 @@ public class RootFrame extends JFrame {
 
         reminderManager  = new ReminderManager(petPanel);
         blacklistManager = new BlacklistManager();
+        todoManager      = new TodoManager();
 
         setupTrayIcon();
 
@@ -235,6 +243,12 @@ public class RootFrame extends JFrame {
         }
         showFromTray(); // 確保視窗可見
         if (!isFocusActive) {
+            // 顯示任務選擇對話框
+            TaskSelectDialog taskDialog = new TaskSelectDialog(this, todoManager);
+            taskDialog.setVisible(true);
+            if (taskDialog.isCancelled()) return;
+            currentFocusTask = taskDialog.getSelectedTitle();
+
             try {
                 isFocusActive      = true;
                 focusStartTime     = System.currentTimeMillis();
@@ -242,12 +256,16 @@ public class RootFrame extends JFrame {
                 petOpacity         = 1.0f;
                 String url         = localServer.start();
                 phoneMonitorActive = true;
-                petPanel.setState("normal", "專注模式啟動！加油！");
+                String startMsg = currentFocusTask != null
+                    ? "收到！我們現在全力解決『" + currentFocusTask + "』！"
+                    : "專注模式啟動！加油！";
+                petPanel.setState("normal", startMsg);
                 resetInactivityTimer();
                 getOrCreateDashboard().onFocusStarted(url);
             } catch (IOException e) {
-                isFocusActive  = false;
-                focusStartTime = 0;
+                isFocusActive    = false;
+                focusStartTime   = 0;
+                currentFocusTask = null;
                 JOptionPane.showMessageDialog(this, "無法啟動伺服器：" + e.getMessage());
             }
         } else {
@@ -261,9 +279,13 @@ public class RootFrame extends JFrame {
         statsManager.onFocusEnd();
         focusStartTime     = 0;
         phoneMonitorActive = false;
-        isFocusActive = false;
+        isFocusActive      = false;
+        currentFocusTask   = null;
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
+        if (moveTimer       != null) { moveTimer.stop(); moveTimer = null; }
+        petPanel.setDirectedWalk(false);
+        if (preMovePos != null) { setLocation(preMovePos); preMovePos = null; }
         petOpacity = 1.0f;
         petPanel.repaint();
         if (webhookHandler  != null) webhookHandler.cancelLeave();
@@ -292,8 +314,10 @@ public class RootFrame extends JFrame {
     public WebHookHandler    getWebhookHandler()    { return webhookHandler; }
     public ReminderManager   getReminderManager()   { return reminderManager; }
     public BlacklistManager  getBlacklistManager()  { return blacklistManager; }
+    public TodoManager       getTodoManager()       { return todoManager; }
     public boolean           isFocusActive()        { return isFocusActive; }
     public String            getCurrentFocusUrl()   { return localServer != null ? localServer.getLocalUrl() : null; }
+    public String            getCurrentFocusTask()  { return currentFocusTask; }
 
     public long getFocusElapsedMs() {
         if (!isFocusActive || focusStartTime == 0) return 0;
@@ -345,16 +369,85 @@ public class RootFrame extends JFrame {
         petPanel.setState(state, message);
     }
 
-    /** Stage 2 警告：嗶聲後將寵物移到螢幕中央 */
+    /** Stage 2 警告：寵物衝刺到螢幕中央，停留 3 秒後衝回原位 */
     public void moveToCenter() {
-        setLocationRelativeTo(null);
         setVisible(true);
         toFront();
-        petPanel.setState("angry", "回來讀書！！");
+        if (preMovePos == null) preMovePos = getLocation();
+
+        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        Point center = new Point(screen.width  / 2 - getWidth()  / 2,
+                                 screen.height / 2 - getHeight() / 2);
+
+        walkToPosition(center, "找你來了！！", () -> {
+            String arriveMsg = currentFocusTask != null
+                ? "你的『" + currentFocusTask + "』呢？！快回來！！"
+                : "回來讀書！！快！！";
+            petPanel.setState("angry", arriveMsg);
+            Toolkit.getDefaultToolkit().beep();
+            Timer stay = new Timer(3000, e -> {
+                returnToPreMovePos();
+                ((Timer) e.getSource()).stop();
+            });
+            stay.setRepeats(false);
+            stay.start();
+        });
+    }
+
+    private void returnToPreMovePos() {
+        if (preMovePos == null) return;
+        Point target = preMovePos;
+        walkToPosition(target, "我回去了！", () -> {
+            preMovePos = null;
+            String msg = currentFocusTask != null
+                ? "繼續完成『" + currentFocusTask + "』！加油！"
+                : "繼續讀書！加油！";
+            petPanel.setState("normal", msg);
+        });
+    }
+
+    /**
+     * 讓寵物以走路動畫斜線衝刺到目標位置。
+     * 每 40 ms 移動一次，方向向量正規化後乘以速度；抵達後執行 onArrived。
+     */
+    private void walkToPosition(Point target, String msgWhileWalking, Runnable onArrived) {
+        if (moveTimer != null) { moveTimer.stop(); moveTimer = null; }
+        petPanel.setDirectedWalk(true);
+
+        final int      SPEED   = 9;
+        final String[] lastDir = {""};
+
+        moveTimer = new Timer(40, null);
+        moveTimer.addActionListener(e -> {
+            Point  cur  = getLocation();
+            double dx   = target.x - cur.x;
+            double dy   = target.y - cur.y;
+            double dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist <= SPEED) {
+                setLocation(target.x, target.y);
+                ((Timer) e.getSource()).stop();
+                moveTimer = null;
+                petPanel.setDirectedWalk(false);
+                SwingUtilities.invokeLater(() -> { if (onArrived != null) onArrived.run(); });
+            } else {
+                int    moveX = (int)(SPEED * dx / dist);
+                int    moveY = (int)(SPEED * dy / dist);
+                String dir   = (dx < 0) ? "walk_left" : "walk_right";
+                if (!dir.equals(lastDir[0])) {
+                    petPanel.setState(dir, msgWhileWalking);
+                    lastDir[0] = dir;
+                }
+                setLocation(cur.x + moveX, cur.y + moveY);
+            }
+        });
+        moveTimer.start();
     }
 
     /** Stage 3 懲罰：彈出警告並結束本次專注 */
     public void triggerFocusFailed(String keyword) {
+        if (moveTimer != null) { moveTimer.stop(); moveTimer = null; }
+        petPanel.setDirectedWalk(false);
         petOpacity = 1.0f;
         petPanel.showAlert();
         petPanel.setState("angry", "違規！專注失敗！");
