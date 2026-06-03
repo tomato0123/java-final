@@ -61,6 +61,7 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
 
         } else if (elapsedMs >= 2_000 && warnStage < 1) {
             warnStage = 1;
+            root.recordDistraction();
             SwingUtilities.invokeLater(() -> {
                 root.triggerAlert();
                 root.getPetPanel().setState("angry", "偵測到分心軟體：" + keyword + "！");

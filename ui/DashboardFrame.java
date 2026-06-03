@@ -21,6 +21,8 @@ public class DashboardFrame extends JFrame {
     private JLabel      leaveStatusLabel;
     private JLabel      countdownLabel;
     private Timer       countdownTimer;
+    private StatsTab    statsTab;
+    private JButton     phoneToggleBtn;
 
     public DashboardFrame(RootFrame root) {
         this.root = root;
@@ -32,9 +34,12 @@ public class DashboardFrame extends JFrame {
         tabs = new JTabbedPane();
         tabs.addTab("寵物與外觀", createPetPanel());
         tabs.addTab("專注監控",   createFocusPanel());
+        statsTab = new StatsTab(root);
+        tabs.addTab("數據分析",   statsTab);
         tabs.addTab("定時提醒",   new ReminderTab(root.getReminderManager()));
         tabs.addTab("倒數計時",   new CountdownTab(root.getReminderManager()));
         tabs.addTab("黑名單設定", new BlacklistTab(root.getBlacklistManager()));
+        tabs.addChangeListener(e -> { if (tabs.getSelectedComponent() == statsTab) statsTab.refresh(); });
         add(tabs);
 
         // 若開啟時專注已在進行中，直接顯示 QR Code
@@ -82,6 +87,8 @@ public class DashboardFrame extends JFrame {
             if (countdownTimer != null) countdownTimer.stop();
             countdownTimer = new Timer(500, e -> updateCountdown());
             countdownTimer.start();
+            if (phoneToggleBtn != null) phoneToggleBtn.setText("📵 停用手機監控");
+            statsTab.refresh();
         });
     }
 
@@ -89,6 +96,19 @@ public class DashboardFrame extends JFrame {
         SwingUtilities.invokeLater(() -> {
             if (countdownTimer != null) countdownTimer.stop();
             focusCards.show(focusCardParent, "idle");
+            statsTab.refresh();
+        });
+    }
+
+    public void onPhoneMonitorChanged(boolean active) {
+        SwingUtilities.invokeLater(() -> {
+            if (phoneToggleBtn != null)
+                phoneToggleBtn.setText(active ? "📵 停用手機監控" : "📱 重新連線手機");
+            if (!active) {
+                qrLabel.setIcon(null);
+                qrLabel.setText("<html><center>手機監控已停用<br>點「重新連線手機」即可恢復</center></html>");
+                urlField.setText("（已停用）");
+            }
         });
     }
 
@@ -115,14 +135,26 @@ public class DashboardFrame extends JFrame {
         g.gridx = 1;
         panel.add(wanderBox, g);
 
+        g.gridx = 0; g.gridy = 2;
+        panel.add(new JLabel("番茄鐘目標：", SwingConstants.RIGHT), g);
+        JSpinner pomSpinner = new JSpinner(new SpinnerNumberModel(
+            ConfigManager.getPomodoroDuration(), 0, 120, 5));
+        pomSpinner.setPreferredSize(new Dimension(65, 26));
+        JPanel pomRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        pomRow.add(pomSpinner);
+        pomRow.add(new JLabel("分鐘（0 = 不顯示進度條）"));
+        g.gridx = 1;
+        panel.add(pomRow, g);
+
         JButton saveBtn = new JButton("儲存並套用");
         saveBtn.addActionListener(e -> {
             ConfigManager.setPetType((String) petBox.getSelectedItem());
             ConfigManager.setWanderAllowed(wanderBox.isSelected());
+            ConfigManager.setPomodoroDuration((Integer) pomSpinner.getValue());
             root.getPetPanel().reloadSettings();
             JOptionPane.showMessageDialog(this, "設定已更新！");
         });
-        g.gridx = 1; g.gridy = 2;
+        g.gridx = 1; g.gridy = 3;
         panel.add(saveBtn, g);
 
         return panel;
@@ -229,7 +261,16 @@ public class DashboardFrame extends JFrame {
         endBtn.setForeground(new Color(180, 0, 0));
         endBtn.setFont(new Font("Microsoft JhengHei", Font.BOLD, 13));
         endBtn.addActionListener(e -> root.stopFocusSession());
-        leavePanel.add(endBtn, BorderLayout.SOUTH);
+
+        phoneToggleBtn = new JButton("📵 停用手機監控");
+        phoneToggleBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
+        phoneToggleBtn.addActionListener(e -> root.togglePhoneMonitor());
+
+        JPanel controlBtns = new JPanel(new GridLayout(1, 2, 6, 0));
+        controlBtns.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
+        controlBtns.add(phoneToggleBtn);
+        controlBtns.add(endBtn);
+        leavePanel.add(controlBtns, BorderLayout.SOUTH);
 
         panel.add(leavePanel, BorderLayout.SOUTH);
         return panel;

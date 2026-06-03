@@ -295,5 +295,43 @@ public class PetPanel extends JPanel {
             g2d.setColor(new Color(220, 0, 0));
             g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
         }
+
+        // ── 專注 HUD（計時器 + 進度條，永遠繪製在最頂層）──
+        if (root.isFocusActive()) {
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+
+            long   elapsed  = root.getFocusElapsedMs();
+            long   secs     = elapsed / 1000;
+            String timerTxt = String.format("專注 %02d:%02d", secs / 60, secs % 60);
+
+            g2d.setFont(new Font("Microsoft JhengHei", Font.BOLD, 12));
+            FontMetrics fm = g2d.getFontMetrics();
+            int tw = fm.stringWidth(timerTxt);
+            int tx = (getWidth() - tw) / 2;
+            int ty = 100;
+
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.78f));
+            g2d.setColor(new Color(15, 20, 50));
+            g2d.fillRoundRect(tx - 8, ty - fm.getAscent() - 2, tw + 16, fm.getHeight() + 4, 10, 10);
+
+            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+            g2d.setColor(new Color(0, 210, 255));
+            g2d.drawString(timerTxt, tx, ty);
+
+            int pomMins = config.ConfigManager.getPomodoroDuration();
+            if (pomMins > 0) {
+                long  targetMs = pomMins * 60_000L;
+                float progress = Math.min(1f, (float) elapsed / targetMs);
+                int   bx = 10, by = 283, bw = getWidth() - 20, bh = 5;
+
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
+                g2d.setColor(new Color(40, 50, 80));
+                g2d.fillRoundRect(bx, by, bw, bh, bh, bh);
+
+                g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.9f));
+                g2d.setColor(progress >= 1f ? new Color(255, 215, 0) : new Color(0, 220, 120));
+                g2d.fillRoundRect(bx, by, Math.max(bh, (int)(bw * progress)), bh, bh, bh);
+            }
+        }
     }
 }
