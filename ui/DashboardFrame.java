@@ -37,7 +37,7 @@ public class DashboardFrame extends JFrame {
         statsTab = new StatsTab(root);
         tabs.addTab("數據分析",   statsTab);
         tabs.addTab("定時提醒",   new ReminderTab(root.getReminderManager()));
-        tabs.addTab("倒數計時",   new CountdownTab(root.getReminderManager()));
+        tabs.addTab("待辦事項",   new TodoTab(root.getTodoManager()));
         tabs.addTab("黑名單設定", new BlacklistTab(root.getBlacklistManager()));
         tabs.addChangeListener(e -> { if (tabs.getSelectedComponent() == statsTab) statsTab.refresh(); });
         add(tabs);

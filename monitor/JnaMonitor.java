@@ -49,6 +49,7 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
 
     private void escalate(long elapsedMs, String keyword) {
         boolean focusActive = root.isFocusActive();
+        String  task        = root.getCurrentFocusTask();
 
         if (focusActive && elapsedMs >= 10_000 && warnStage < 3) {
             warnStage = 3;
@@ -62,15 +63,16 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
         } else if (elapsedMs >= 2_000 && warnStage < 1) {
             warnStage = 1;
             root.recordDistraction();
+            String petMsg   = task != null
+                ? "你的『" + task + "』進度如何了？不要偷懶喔！"
+                : "偵測到分心軟體：" + keyword + "！";
+            String toastMsg = task != null
+                ? "偵測到「" + keyword + "」，快去完成『" + task + "』！"
+                : "偵測到「" + keyword + "」，請回到學習！";
             SwingUtilities.invokeLater(() -> {
                 root.triggerAlert();
-                root.getPetPanel().setState("angry", "偵測到分心軟體：" + keyword + "！");
-                ToastNotification.show(
-                    "⚠ 分心警告",
-                    "偵測到「" + keyword + "」，請回到學習！",
-                    () -> {},
-                    () -> {}
-                );
+                root.getPetPanel().setState("angry", petMsg);
+                ToastNotification.show("⚠ 分心警告", toastMsg, () -> {}, () -> {});
             });
         }
     }
@@ -79,8 +81,11 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
         if (distractionStart != 0) {
             warnStage        = 0;
             distractionStart = 0;
-            SwingUtilities.invokeLater(() ->
-                root.getPetPanel().setState("normal", "很好！繼續保持專注！"));
+            String task = root.getCurrentFocusTask();
+            String msg  = task != null
+                ? "繼續！『" + task + "』等著你完成！"
+                : "很好！繼續保持專注！";
+            SwingUtilities.invokeLater(() -> root.getPetPanel().setState("normal", msg));
         }
     }
 }
