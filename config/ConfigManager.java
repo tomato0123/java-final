@@ -46,4 +46,13 @@ public class ConfigManager {
         properties.setProperty("allowWander", String.valueOf(allowed));
         saveConfig();
     }
+
+    public static int getPomodoroDuration() {
+        return Integer.parseInt(properties.getProperty("pomodoroDuration", "25"));
+    }
+
+    public static void setPomodoroDuration(int minutes) {
+        properties.setProperty("pomodoroDuration", String.valueOf(minutes));
+        saveConfig();
+    }
 }

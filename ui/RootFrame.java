@@ -1,6 +1,7 @@
 package ui;
 
 import config.BlacklistManager;
+import config.FocusStatsManager;
 import config.ReminderManager;
 import network.LocalServer;
 import network.WebHookHandler;
@@ -21,7 +22,10 @@ public class RootFrame extends JFrame {
     private WebHookHandler   webhookHandler;
     private LocalServer      localServer;
     private DashboardFrame   dashboardFrame;
-    private boolean          isFocusActive = false;
+    private boolean           isFocusActive     = false;
+    private long              focusStartTime    = 0;
+    private FocusStatsManager statsManager      = new FocusStatsManager();
+    private boolean           phoneMonitorActive = false;
 
     // ── 透明淡出 ──────────────────────────────────
     private volatile float petOpacity      = 1.0f;
@@ -232,14 +236,18 @@ public class RootFrame extends JFrame {
         showFromTray(); // 確保視窗可見
         if (!isFocusActive) {
             try {
-                isFocusActive = true;
-                petOpacity    = 1.0f;
-                String url    = localServer.start();
+                isFocusActive      = true;
+                focusStartTime     = System.currentTimeMillis();
+                statsManager.onFocusStart();
+                petOpacity         = 1.0f;
+                String url         = localServer.start();
+                phoneMonitorActive = true;
                 petPanel.setState("normal", "專注模式啟動！加油！");
                 resetInactivityTimer();
                 getOrCreateDashboard().onFocusStarted(url);
             } catch (IOException e) {
-                isFocusActive = false;
+                isFocusActive  = false;
+                focusStartTime = 0;
                 JOptionPane.showMessageDialog(this, "無法啟動伺服器：" + e.getMessage());
             }
         } else {
@@ -250,6 +258,9 @@ public class RootFrame extends JFrame {
     }
 
     public void stopFocusSession() {
+        statsManager.onFocusEnd();
+        focusStartTime     = 0;
+        phoneMonitorActive = false;
         isFocusActive = false;
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
@@ -283,6 +294,37 @@ public class RootFrame extends JFrame {
     public BlacklistManager  getBlacklistManager()  { return blacklistManager; }
     public boolean           isFocusActive()        { return isFocusActive; }
     public String            getCurrentFocusUrl()   { return localServer != null ? localServer.getLocalUrl() : null; }
+
+    public long getFocusElapsedMs() {
+        if (!isFocusActive || focusStartTime == 0) return 0;
+        return System.currentTimeMillis() - focusStartTime;
+    }
+
+    public FocusStatsManager getStatsManager()      { return statsManager; }
+    public boolean           isPhoneMonitorActive() { return phoneMonitorActive; }
+
+    public void togglePhoneMonitor() {
+        if (!isFocusActive) return;
+        if (phoneMonitorActive) {
+            if (localServer != null) localServer.stop();
+            phoneMonitorActive = false;
+            if (dashboardFrame != null && dashboardFrame.isDisplayable())
+                dashboardFrame.onPhoneMonitorChanged(false);
+        } else {
+            if (localServer != null) {
+                try {
+                    String url = localServer.start();
+                    phoneMonitorActive = true;
+                    if (dashboardFrame != null && dashboardFrame.isDisplayable())
+                        dashboardFrame.onFocusStarted(url);
+                } catch (IOException e) {
+                    JOptionPane.showMessageDialog(this, "無法重新連線：" + e.getMessage());
+                }
+            }
+        }
+    }
+
+    public void recordDistraction() { statsManager.onDistraction(); }
 
     /** 取得或建立控制面板（singleton，關閉後重建） */
     public DashboardFrame getOrCreateDashboard() {
