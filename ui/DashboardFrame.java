@@ -335,15 +335,15 @@ public class DashboardFrame extends JFrame {
         JPanel cards = new JPanel(new GridLayout(1, 3, 6, 0));
         cards.setOpaque(false);
 
-        activeCoinLabel = new JLabel("0 枚", SwingConstants.CENTER);
+        activeCoinLabel = new JLabel(root.getCoinManager().getCoins() + " 枚", SwingConstants.CENTER);
         activeCoinLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
         activeCoinLabel.setForeground(new Color(180, 120, 0));
 
-        activeComboLabel = new JLabel("1x", SwingConstants.CENTER);
+        activeComboLabel = new JLabel(root.getCoinManager().getCombo() + "x", SwingConstants.CENTER);
         activeComboLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
         activeComboLabel.setForeground(new Color(210, 70, 0));
 
-        activeNextRewardLabel = new JLabel("+50 枚", SwingConstants.CENTER);
+        activeNextRewardLabel = new JLabel("+" + root.getCoinManager().getNextReward() + " 枚", SwingConstants.CENTER);
         activeNextRewardLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
         activeNextRewardLabel.setForeground(new Color(0, 140, 80));
 
