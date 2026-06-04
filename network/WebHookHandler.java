@@ -9,7 +9,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 public class WebHookHandler implements HttpHandler {
-    private PetPanel pet;
+    private PetPanel  pet;
+    private Runnable  onComboBreak;
 
     private volatile boolean isOnLeave = false;
     private volatile long leaveEndTime = 0;
@@ -17,6 +18,11 @@ public class WebHookHandler implements HttpHandler {
 
     public WebHookHandler(PetPanel pet) {
         this.pet = pet;
+    }
+
+    /** Called by RootFrame after construction to wire the combo-break callback. */
+    public void setOnComboBreak(Runnable callback) {
+        this.onComboBreak = callback;
     }
 
     public void applyForLeave(int minutes) {
@@ -89,8 +95,10 @@ public class WebHookHandler implements HttpHandler {
         } else if (isOnLeave && now > leaveEndTime) {
             isOnLeave = false;
             if (leaveExpiryTimer != null) leaveExpiryTimer.stop();
+            if (onComboBreak != null) onComboBreak.run();
             pet.triggerViolation("逾假未歸！嚴重扣血！！！");
         } else {
+            if (onComboBreak != null) onComboBreak.run();
             pet.triggerViolation("抓到了！偷滑手機！扣血！");
         }
     }

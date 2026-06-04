@@ -1,6 +1,8 @@
 package ui;
 
 import config.BlacklistManager;
+import config.CoinManager;
+import config.ConfigManager;
 import config.FocusStatsManager;
 import config.ReminderManager;
 import config.TodoManager;
@@ -21,6 +23,7 @@ public class RootFrame extends JFrame {
     private ReminderManager  reminderManager;
     private BlacklistManager blacklistManager;
     private TodoManager      todoManager;
+    private CoinManager      coinManager;
     private WebHookHandler   webhookHandler;
     private LocalServer      localServer;
     private DashboardFrame   dashboardFrame;
@@ -58,6 +61,7 @@ public class RootFrame extends JFrame {
         reminderManager  = new ReminderManager(petPanel);
         blacklistManager = new BlacklistManager();
         todoManager      = new TodoManager();
+        coinManager      = new CoinManager();
 
         setupTrayIcon();
 
@@ -276,11 +280,21 @@ public class RootFrame extends JFrame {
     }
 
     public void stopFocusSession() {
+        long sessionStart  = focusStartTime; // capture before reset
         statsManager.onFocusEnd();
         focusStartTime     = 0;
         phoneMonitorActive = false;
         isFocusActive      = false;
         currentFocusTask   = null;
+
+        // Award coins if at least one pomodoro duration was completed
+        if (sessionStart > 0) {
+            int pomMin = ConfigManager.getPomodoroDuration();
+            if (pomMin == 0) pomMin = 25;
+            if (System.currentTimeMillis() - sessionStart >= (long) pomMin * 60_000) {
+                coinManager.onPomodoroCompleted();
+            }
+        }
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
         if (moveTimer       != null) { moveTimer.stop(); moveTimer = null; }
@@ -308,6 +322,14 @@ public class RootFrame extends JFrame {
     public void setNetworkComponents(WebHookHandler wh, LocalServer ls) {
         this.webhookHandler = wh;
         this.localServer    = ls;
+        wh.setOnComboBreak(() -> coinManager.breakCombo());
+    }
+
+    /** Spends coins and grants a 10-minute relax leave. Returns false if coins are insufficient. */
+    public boolean purchaseRelaxPass() {
+        if (!coinManager.spendCoins(CoinManager.RELAX_PASS_COST)) return false;
+        applyForLeave(10);
+        return true;
     }
 
     public PetPanel          getPetPanel()          { return petPanel; }
@@ -315,6 +337,7 @@ public class RootFrame extends JFrame {
     public ReminderManager   getReminderManager()   { return reminderManager; }
     public BlacklistManager  getBlacklistManager()  { return blacklistManager; }
     public TodoManager       getTodoManager()       { return todoManager; }
+    public CoinManager       getCoinManager()       { return coinManager; }
     public boolean           isFocusActive()        { return isFocusActive; }
     public String            getCurrentFocusUrl()   { return localServer != null ? localServer.getLocalUrl() : null; }
     public String            getCurrentFocusTask()  { return currentFocusTask; }

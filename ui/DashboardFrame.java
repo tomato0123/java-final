@@ -1,5 +1,6 @@
 package ui;
 
+import config.CoinManager;
 import config.ConfigManager;
 import network.WebHookHandler;
 
@@ -20,6 +21,9 @@ public class DashboardFrame extends JFrame {
     private JTextField  urlField;
     private JLabel      leaveStatusLabel;
     private JLabel      countdownLabel;
+    private JLabel      activeCoinLabel;
+    private JLabel      activeComboLabel;
+    private JLabel      activeNextRewardLabel;
     private Timer       countdownTimer;
     private StatsTab    statsTab;
     private JButton     phoneToggleBtn;
@@ -27,19 +31,20 @@ public class DashboardFrame extends JFrame {
     public DashboardFrame(RootFrame root) {
         this.root = root;
         setTitle("系統控制面板");
-        setSize(480, 530);
+        setSize(490, 680);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         tabs = new JTabbedPane();
-        tabs.addTab("寵物與外觀", createPetPanel());
-        tabs.addTab("專注監控",   createFocusPanel());
+        tabs.addTab("寵物與外觀", wrapInScroll(createPetPanel()));
+        tabs.addTab("專注監控",   createFocusPanel());              // 已有內建 scroll
         statsTab = new StatsTab(root);
-        tabs.addTab("數據分析",   statsTab);
-        tabs.addTab("定時提醒",   new ReminderTab(root.getReminderManager()));
-        tabs.addTab("待辦事項",   new TodoTab(root.getTodoManager()));
-        tabs.addTab("黑名單設定", new BlacklistTab(root.getBlacklistManager()));
-        tabs.addChangeListener(e -> { if (tabs.getSelectedComponent() == statsTab) statsTab.refresh(); });
+        tabs.addTab("數據分析",   wrapInScroll(statsTab));
+        tabs.addTab("定時提醒",   wrapInScroll(new ReminderTab(root.getReminderManager())));
+        tabs.addTab("待辦事項",   wrapInScroll(new TodoTab(root.getTodoManager())));
+        tabs.addTab("黑名單設定", wrapInScroll(new BlacklistTab(root.getBlacklistManager())));
+        // 用 index 比對（getSelectedComponent() 回傳的是 JScrollPane wrapper，不是 statsTab）
+        tabs.addChangeListener(e -> { if (tabs.getSelectedIndex() == 2) statsTab.refresh(); });
         add(tabs);
 
         // 若開啟時專注已在進行中，直接顯示 QR Code
@@ -135,26 +140,14 @@ public class DashboardFrame extends JFrame {
         g.gridx = 1;
         panel.add(wanderBox, g);
 
-        g.gridx = 0; g.gridy = 2;
-        panel.add(new JLabel("番茄鐘目標：", SwingConstants.RIGHT), g);
-        JSpinner pomSpinner = new JSpinner(new SpinnerNumberModel(
-            ConfigManager.getPomodoroDuration(), 0, 120, 5));
-        pomSpinner.setPreferredSize(new Dimension(65, 26));
-        JPanel pomRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-        pomRow.add(pomSpinner);
-        pomRow.add(new JLabel("分鐘（0 = 不顯示進度條）"));
-        g.gridx = 1;
-        panel.add(pomRow, g);
-
         JButton saveBtn = new JButton("儲存並套用");
         saveBtn.addActionListener(e -> {
             ConfigManager.setPetType((String) petBox.getSelectedItem());
             ConfigManager.setWanderAllowed(wanderBox.isSelected());
-            ConfigManager.setPomodoroDuration((Integer) pomSpinner.getValue());
             root.getPetPanel().reloadSettings();
             JOptionPane.showMessageDialog(this, "設定已更新！");
         });
-        g.gridx = 1; g.gridy = 3;
+        g.gridx = 1; g.gridy = 2;
         panel.add(saveBtn, g);
 
         return panel;
@@ -166,7 +159,7 @@ public class DashboardFrame extends JFrame {
     private JPanel createFocusPanel() {
         focusCards      = new CardLayout();
         focusCardParent = new JPanel(focusCards);
-        focusCardParent.add(buildFocusIdleCard(),   "idle");
+        focusCardParent.add(wrapInScroll(buildFocusIdleCard()),   "idle");
         focusCardParent.add(buildFocusActiveCard(), "active");
         return focusCardParent;
     }
@@ -187,19 +180,39 @@ public class DashboardFrame extends JFrame {
         g.gridx = 0; g.gridy = 0;
         panel.add(desc, g);
 
+        // 番茄鐘目標
+        g.gridwidth = 1; g.gridx = 0; g.gridy = 1;
+        g.insets = new Insets(4, 10, 4, 4);
+        panel.add(new JLabel("番茄鐘目標：", SwingConstants.RIGHT), g);
+        JSpinner pomSpinner = new JSpinner(new SpinnerNumberModel(
+            ConfigManager.getPomodoroDuration(), 0, 120, 5));
+        pomSpinner.setPreferredSize(new Dimension(65, 26));
+        JPanel pomRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        pomRow.add(pomSpinner);
+        pomRow.add(new JLabel("分鐘（0 = 不顯示進度條）"));
+        g.gridx = 1;
+        panel.add(pomRow, g);
+        pomSpinner.addChangeListener(e -> {
+            ConfigManager.setPomodoroDuration((Integer) pomSpinner.getValue());
+            root.getPetPanel().reloadSettings();
+        });
+
+        g.gridwidth = 2; g.gridx = 0; g.gridy = 2;
+        g.insets = new Insets(10, 10, 10, 10);
         JButton focusBtn = new JButton("▶ 開始專注");
         focusBtn.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
         focusBtn.addActionListener(e -> root.startFocusSession());
-        g.gridy = 1;
         panel.add(focusBtn, g);
 
         return panel;
     }
 
-    /** 專注進行中顯示（QR Code + 請假系統） */
+    /** 專注進行中顯示（QR Code + 專注金幣 + 請假系統），可垂直滾動 */
     private JPanel buildFocusActiveCard() {
-        JPanel panel = new JPanel(new BorderLayout(0, 6));
-        panel.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        // 所有元件以 BoxLayout Y 垂直堆疊，確保橫向全寬對齊
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
         // ── WiFi 提示 ──
         JLabel hint = new JLabel(
@@ -212,28 +225,35 @@ public class DashboardFrame extends JFrame {
         hint.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(new Color(220, 180, 80)),
             BorderFactory.createEmptyBorder(4, 8, 4, 8)));
-        panel.add(hint, BorderLayout.NORTH);
+        hint.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(hint);
+        content.add(Box.createVerticalStrut(6));
 
         // ── QR Code + URL ──
         JPanel qrSection = new JPanel(new BorderLayout(0, 6));
         qrSection.setBorder(BorderFactory.createEmptyBorder(6, 0, 4, 0));
-
+        qrSection.setAlignmentX(Component.LEFT_ALIGNMENT);
         qrLabel = new JLabel("", SwingConstants.CENTER);
         qrLabel.setPreferredSize(new Dimension(160, 160));
         qrSection.add(qrLabel, BorderLayout.CENTER);
-
         urlField = new JTextField();
         urlField.setEditable(false);
         urlField.setHorizontalAlignment(JTextField.CENTER);
         urlField.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
         qrSection.add(urlField, BorderLayout.SOUTH);
+        content.add(qrSection);
+        content.add(Box.createVerticalStrut(4));
 
-        panel.add(qrSection, BorderLayout.CENTER);
+        // ── 專注金幣 ──
+        JPanel coinPanel = buildActiveCoinPanel();
+        coinPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(coinPanel);
+        content.add(Box.createVerticalStrut(4));
 
         // ── 請假系統 + 結束 ──
         JPanel leavePanel = new JPanel(new BorderLayout(0, 4));
         leavePanel.setBorder(BorderFactory.createTitledBorder("請假系統"));
-
+        leavePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
         JPanel statusRow = new JPanel(new GridLayout(2, 1, 0, 2));
         leaveStatusLabel = new JLabel("狀態：專注中", SwingConstants.CENTER);
         leaveStatusLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
@@ -242,7 +262,6 @@ public class DashboardFrame extends JFrame {
         statusRow.add(leaveStatusLabel);
         statusRow.add(countdownLabel);
         leavePanel.add(statusRow, BorderLayout.NORTH);
-
         JPanel leaveBtns = new JPanel(new GridLayout(1, 4, 4, 0));
         leaveBtns.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         for (int min : new int[]{1, 3, 5, 10}) {
@@ -256,24 +275,31 @@ public class DashboardFrame extends JFrame {
             leaveBtns.add(b);
         }
         leavePanel.add(leaveBtns, BorderLayout.CENTER);
-
         JButton endBtn = new JButton("⏹ 結束專注");
         endBtn.setForeground(new Color(180, 0, 0));
         endBtn.setFont(new Font("Microsoft JhengHei", Font.BOLD, 13));
         endBtn.addActionListener(e -> root.stopFocusSession());
-
         phoneToggleBtn = new JButton("📵 停用手機監控");
         phoneToggleBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
         phoneToggleBtn.addActionListener(e -> root.togglePhoneMonitor());
-
         JPanel controlBtns = new JPanel(new GridLayout(1, 2, 6, 0));
         controlBtns.setBorder(BorderFactory.createEmptyBorder(4, 0, 0, 0));
         controlBtns.add(phoneToggleBtn);
         controlBtns.add(endBtn);
         leavePanel.add(controlBtns, BorderLayout.SOUTH);
+        content.add(leavePanel);
 
-        panel.add(leavePanel, BorderLayout.SOUTH);
-        return panel;
+        // ── 整個 active card 包進 JScrollPane ──
+        JScrollPane scrollPane = new JScrollPane(content,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.add(scrollPane, BorderLayout.CENTER);
+        return wrapper;
     }
 
     private void updateCountdown() {
@@ -293,5 +319,78 @@ public class DashboardFrame extends JFrame {
             countdownLabel.setText(" ");
             leaveStatusLabel.setText("狀態：專注中");
         }
+        // 同步更新金幣三欄
+        if (activeCoinLabel != null) {
+            activeCoinLabel.setText(root.getCoinManager().getCoins() + " 枚");
+            activeComboLabel.setText(root.getCoinManager().getCombo() + "x");
+            activeNextRewardLabel.setText("+" + root.getCoinManager().getNextReward() + " 枚");
+        }
+    }
+
+    // ── 專注中金幣儀表板（active card 內）──────────
+    private JPanel buildActiveCoinPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.setBorder(BorderFactory.createTitledBorder("專注金幣"));
+
+        JPanel cards = new JPanel(new GridLayout(1, 3, 6, 0));
+        cards.setOpaque(false);
+
+        activeCoinLabel = new JLabel("0 枚", SwingConstants.CENTER);
+        activeCoinLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        activeCoinLabel.setForeground(new Color(180, 120, 0));
+
+        activeComboLabel = new JLabel("1x", SwingConstants.CENTER);
+        activeComboLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        activeComboLabel.setForeground(new Color(210, 70, 0));
+
+        activeNextRewardLabel = new JLabel("+50 枚", SwingConstants.CENTER);
+        activeNextRewardLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        activeNextRewardLabel.setForeground(new Color(0, 140, 80));
+
+        cards.add(makeCoinCard("💰 金幣餘額",    activeCoinLabel));
+        cards.add(makeCoinCard("⚡ 專注回饋倍率", activeComboLabel));
+        cards.add(makeCoinCard("🎁 下次獎勵",    activeNextRewardLabel));
+        panel.add(cards, BorderLayout.CENTER);
+
+        JButton buyBtn = new JButton(
+            "購買 10 分鐘放鬆通行證（需要 " + CoinManager.RELAX_PASS_COST + " 枚金幣）");
+        buyBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
+        buyBtn.addActionListener(e -> {
+            if (!root.purchaseRelaxPass()) {
+                JOptionPane.showMessageDialog(this,
+                    "金幣不足！需要 " + CoinManager.RELAX_PASS_COST
+                    + " 枚，目前只有 " + root.getCoinManager().getCoins() + " 枚。");
+                return;
+            }
+            activeCoinLabel.setText(root.getCoinManager().getCoins() + " 枚");
+            JOptionPane.showMessageDialog(this, "已購買！享受你的 10 分鐘放鬆時光～");
+        });
+        panel.add(buyBtn, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel makeCoinCard(String title, JLabel value) {
+        JPanel card = new JPanel(new BorderLayout(0, 2));
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 215, 240)),
+            BorderFactory.createEmptyBorder(4, 4, 4, 4)));
+        card.setBackground(new Color(245, 248, 255));
+        JLabel titleLbl = new JLabel(title, SwingConstants.CENTER);
+        titleLbl.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 10));
+        titleLbl.setForeground(Color.GRAY);
+        card.add(titleLbl, BorderLayout.NORTH);
+        card.add(value, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JScrollPane wrapInScroll(JComponent content) {
+        JScrollPane sp = new JScrollPane(content,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        sp.setBorder(null);
+        sp.getVerticalScrollBar().setUnitIncrement(16);
+        sp.getHorizontalScrollBar().setUnitIncrement(16);
+        return sp;
     }
 }
