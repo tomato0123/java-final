@@ -30,8 +30,10 @@ public class RootFrame extends JFrame {
     private boolean           isFocusActive     = false;
     private long              focusStartTime    = 0;
     private FocusStatsManager statsManager      = new FocusStatsManager();
-    private boolean           phoneMonitorActive = false;
-    private String            currentFocusTask  = null; // null = no task selected
+    private boolean           phoneMonitorActive      = false;
+    private String            currentFocusTask        = null;
+    private Timer             pomodoroCheckTimer      = null;
+    private int               lastPomodoroMilestone   = 0;
 
     // ── 透明淡出 ──────────────────────────────────
     private volatile float petOpacity      = 1.0f;
@@ -254,12 +256,15 @@ public class RootFrame extends JFrame {
             currentFocusTask = taskDialog.getSelectedTitle();
 
             try {
-                isFocusActive      = true;
-                focusStartTime     = System.currentTimeMillis();
+                isFocusActive          = true;
+                focusStartTime         = System.currentTimeMillis();
+                lastPomodoroMilestone  = 0;
                 statsManager.onFocusStart();
-                petOpacity         = 1.0f;
-                String url         = localServer.start();
-                phoneMonitorActive = true;
+                petOpacity             = 1.0f;
+                String url             = localServer.start();
+                phoneMonitorActive     = true;
+                pomodoroCheckTimer     = new Timer(10_000, e -> checkPomodoroMilestone());
+                pomodoroCheckTimer.start();
                 String startMsg = currentFocusTask != null
                     ? "收到！我們現在全力解決『" + currentFocusTask + "』！"
                     : "專注模式啟動！加油！";
@@ -280,29 +285,17 @@ public class RootFrame extends JFrame {
     }
 
     public void stopFocusSession() {
-        long sessionStart  = focusStartTime; // capture before reset
+        // 結束前補跑一次，確保最後一個番茄鐘不會漏掉
+        checkPomodoroMilestone();
+        if (pomodoroCheckTimer   != null) { pomodoroCheckTimer.stop(); pomodoroCheckTimer = null; }
+        lastPomodoroMilestone = 0;
+
         statsManager.onFocusEnd();
         focusStartTime     = 0;
         phoneMonitorActive = false;
         isFocusActive      = false;
         currentFocusTask   = null;
 
-        // Award coins if at least one pomodoro duration was completed
-        int coinsEarned = 0;
-        if (sessionStart > 0) {
-            int pomMin = ConfigManager.getPomodoroDuration();
-            if (pomMin == 0) pomMin = 25;
-            if (System.currentTimeMillis() - sessionStart >= (long) pomMin * 60_000) {
-                coinsEarned = CoinManager.BASE_REWARD * coinManager.getCombo();
-                coinManager.onPomodoroCompleted();
-                int earned = coinsEarned;
-                ToastNotification.show(
-                    "獲得專注金幣！",
-                    "本次獲得 " + earned + " 枚！目前共 " + coinManager.getCoins() + " 枚",
-                    () -> {}, () -> {}
-                );
-            }
-        }
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
         if (moveTimer       != null) { moveTimer.stop(); moveTimer = null; }
@@ -314,14 +307,34 @@ public class RootFrame extends JFrame {
         if (localServer     != null) localServer.stop();
         if (dashboardFrame  != null && dashboardFrame.isDisplayable())
             dashboardFrame.onFocusStopped();
-        if (coinsEarned > 0) {
-            petPanel.setState("happy", "太棒了！獲得 " + coinsEarned + " 枚金幣！辛苦了！");
-        } else {
-            petPanel.setState("normal", "專注結束！辛苦了！");
-        }
+        petPanel.setState("normal", "專注結束！辛苦了！");
 
         // 3 秒後縮回工作列
         new Timer(3000, e -> { hideToTray(); ((Timer) e.getSource()).stop(); }).start();
+    }
+
+    /** 每 10 秒檢查一次，每達成一個番茄鐘立即發幣並通知。 */
+    private void checkPomodoroMilestone() {
+        if (!isFocusActive || focusStartTime == 0) return;
+        int pomMin = ConfigManager.getPomodoroDuration();
+        if (pomMin <= 0) pomMin = 25;
+        long elapsed   = System.currentTimeMillis() - focusStartTime;
+        int  completed = (int)(elapsed / ((long) pomMin * 60_000));
+        while (lastPomodoroMilestone < completed) {
+            lastPomodoroMilestone++;
+            int earned = CoinManager.BASE_REWARD * coinManager.getCombo();
+            coinManager.onPomodoroCompleted();
+            String task = currentFocusTask;
+            String msg  = task != null
+                ? "第 " + lastPomodoroMilestone + " 個番茄鐘完成！獲得 " + earned + " 枚金幣！繼續完成『" + task + "』！"
+                : "第 " + lastPomodoroMilestone + " 個番茄鐘完成！獲得 " + earned + " 枚金幣！繼續加油！";
+            petPanel.setState("happy", msg);
+            ToastNotification.show(
+                "番茄鐘完成！獲得 " + earned + " 枚金幣",
+                "目前共 " + coinManager.getCoins() + " 枚，連擊 " + coinManager.getCombo() + "x",
+                () -> {}, () -> {}
+            );
+        }
     }
 
     public void applyForLeave(int minutes) {

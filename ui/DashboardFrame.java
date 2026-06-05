@@ -244,16 +244,20 @@ public class DashboardFrame extends JFrame {
         content.add(qrSection);
         content.add(Box.createVerticalStrut(4));
 
-        // ── 專注金幣 ──
-        JPanel coinPanel = buildActiveCoinPanel();
-        coinPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(coinPanel);
-        content.add(Box.createVerticalStrut(4));
-
         // ── 請假系統 + 結束 ──
         JPanel leavePanel = new JPanel(new BorderLayout(0, 4));
-        leavePanel.setBorder(BorderFactory.createTitledBorder("請假系統"));
+        leavePanel.setBorder(BorderFactory.createTitledBorder("手機請假系統"));
         leavePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        // 說明文字
+        JLabel leaveDesc = new JLabel(
+            "<html><b>【手機請假】</b>需要短暫拿起手機（上廁所、倒水等）時使用。<br>"
+            + "申請後手機畫面關閉或切換 App 不會觸發違規警告。<br>"
+            + "<b>手機端計時頁面</b>同樣有「申請請假」按鈕，效果完全相同。</html>");
+        leaveDesc.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
+        leaveDesc.setForeground(new Color(90, 90, 90));
+        leaveDesc.setBorder(BorderFactory.createEmptyBorder(2, 4, 4, 4));
+
         JPanel statusRow = new JPanel(new GridLayout(2, 1, 0, 2));
         leaveStatusLabel = new JLabel("狀態：專注中", SwingConstants.CENTER);
         leaveStatusLabel.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
@@ -261,7 +265,12 @@ public class DashboardFrame extends JFrame {
         countdownLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 13));
         statusRow.add(leaveStatusLabel);
         statusRow.add(countdownLabel);
-        leavePanel.add(statusRow, BorderLayout.NORTH);
+
+        JPanel northSection = new JPanel();
+        northSection.setLayout(new BoxLayout(northSection, BoxLayout.Y_AXIS));
+        northSection.add(leaveDesc);
+        northSection.add(statusRow);
+        leavePanel.add(northSection, BorderLayout.NORTH);
         JPanel leaveBtns = new JPanel(new GridLayout(1, 4, 4, 0));
         leaveBtns.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         for (int min : new int[]{1, 3, 5, 10}) {
@@ -288,6 +297,12 @@ public class DashboardFrame extends JFrame {
         controlBtns.add(endBtn);
         leavePanel.add(controlBtns, BorderLayout.SOUTH);
         content.add(leavePanel);
+        content.add(Box.createVerticalStrut(4));
+
+        // ── 專注金幣 ──
+        JPanel coinPanel = buildActiveCoinPanel();
+        coinPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(coinPanel);
 
         // ── 整個 active card 包進 JScrollPane ──
         JScrollPane scrollPane = new JScrollPane(content,

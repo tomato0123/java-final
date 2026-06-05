@@ -88,7 +88,9 @@ public class BlacklistTab extends JPanel {
         panel.setBorder(BorderFactory.createTitledBorder("學習模式豁免（查資料用）"));
 
         JLabel desc = new JLabel(
-            "<html><div style='width:300px'>開啟後黑名單暫停偵測，允許前往 YouTube 等查資料。</div></html>");
+            "<html><b>【電腦查資料】</b>需要在電腦上開啟黑名單網站查閱學習資料時使用。<br>"
+            + "開啟後暫停<b>電腦視窗分心偵測</b>，開 YouTube 等不會觸發警告。<br>"
+            + "時間到後自動恢復偵測，此功能與手機請假無關。</html>");
         desc.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
         panel.add(desc, BorderLayout.NORTH);
 
