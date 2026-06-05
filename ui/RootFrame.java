@@ -354,6 +354,7 @@ public class RootFrame extends JFrame {
     public boolean purchaseRelaxPass() {
         if (!coinManager.spendCoins(CoinManager.RELAX_PASS_COST)) return false;
         applyForLeave(10);
+        blacklistManager.startResearchMode(10);
         return true;
     }
 
