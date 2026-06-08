@@ -1,5 +1,6 @@
 package ui;
 
+import config.CoinManager;
 import config.FocusStatsManager;
 
 import javax.swing.*;
@@ -7,17 +8,27 @@ import java.awt.*;
 
 public class StatsTab extends JPanel {
 
+    private final RootFrame         root;
     private final FocusStatsManager stats;
+    private final CoinManager       coinManager;
     private JLabel     todayFocusLabel;
     private JLabel     todayDistLabel;
+    private JLabel     coinsLabel;
     private ChartPanel chartPanel;
 
     public StatsTab(RootFrame root) {
-        this.stats = root.getStatsManager();
+        this.root        = root;
+        this.stats       = root.getStatsManager();
+        this.coinManager = root.getCoinManager();
         setLayout(new BorderLayout(0, 10));
         setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
-        add(buildTodaySection(), BorderLayout.NORTH);
+        JPanel northPanel = new JPanel();
+        northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
+        northPanel.add(buildTodaySection());
+        northPanel.add(Box.createVerticalStrut(8));
+        northPanel.add(buildCoinSection());
+        add(northPanel, BorderLayout.NORTH);
         add(buildChartSection(), BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
@@ -37,7 +48,24 @@ public class StatsTab extends JPanel {
         todayFocusLabel.setText(String.format("%02d:%02d:%02d",
             secs / 3600, (secs % 3600) / 60, secs % 60));
         todayDistLabel.setText(dist + " 次");
+        coinsLabel.setText(coinManager.getCoins() + " 枚");
         chartPanel.repaint();
+    }
+
+    // ════════════════════════════════════════════
+    //  專注金幣
+    // ════════════════════════════════════════════
+    private JPanel buildCoinSection() {
+        JPanel panel = new JPanel(new BorderLayout(0, 6));
+        panel.setBorder(BorderFactory.createTitledBorder("專注金幣"));
+        panel.setOpaque(false);
+
+        coinsLabel = new JLabel(coinManager.getCoins() + " 枚", SwingConstants.CENTER);
+        coinsLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
+        coinsLabel.setForeground(new Color(180, 120, 0));
+        panel.add(makeCard("💰 金幣餘額", coinsLabel), BorderLayout.CENTER);
+
+        return panel;
     }
 
     // ════════════════════════════════════════════

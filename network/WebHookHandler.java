@@ -9,7 +9,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 public class WebHookHandler implements HttpHandler {
-    private PetPanel pet;
+    private PetPanel  pet;
+    private Runnable  onComboBreak;
 
     private volatile boolean isOnLeave = false;
     private volatile long leaveEndTime = 0;
@@ -17,6 +18,10 @@ public class WebHookHandler implements HttpHandler {
 
     public WebHookHandler(PetPanel pet) {
         this.pet = pet;
+    }
+
+    public void setOnComboBreak(Runnable callback) {
+        this.onComboBreak = callback;
     }
 
     public void applyForLeave(int minutes) {
@@ -71,6 +76,11 @@ public class WebHookHandler implements HttpHandler {
                     if (leaveExpiryTimer != null) leaveExpiryTimer.stop();
                 }
             });
+        } else if (query != null && query.startsWith("leave=")) {
+            try {
+                int min = Integer.parseInt(query.substring(6).trim());
+                if (min >= 1 && min <= 60) applyForLeave(min);
+            } catch (NumberFormatException ignored) {}
         }
 
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
@@ -89,8 +99,10 @@ public class WebHookHandler implements HttpHandler {
         } else if (isOnLeave && now > leaveEndTime) {
             isOnLeave = false;
             if (leaveExpiryTimer != null) leaveExpiryTimer.stop();
+            if (onComboBreak != null) onComboBreak.run();
             pet.triggerViolation("逾假未歸！嚴重扣血！！！");
         } else {
+            if (onComboBreak != null) onComboBreak.run();
             pet.triggerViolation("抓到了！偷滑手機！扣血！");
         }
     }

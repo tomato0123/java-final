@@ -63,6 +63,7 @@ public class JnaMonitor implements WindowMonitor.WindowTitleListener {
         } else if (elapsedMs >= 2_000 && warnStage < 1) {
             warnStage = 1;
             root.recordDistraction();
+            root.getCoinManager().breakCombo();
             String petMsg   = task != null
                 ? "你的『" + task + "』進度如何了？不要偷懶喔！"
                 : "偵測到分心軟體：" + keyword + "！";

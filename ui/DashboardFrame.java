@@ -1,5 +1,6 @@
 package ui;
 
+import config.CoinManager;
 import config.ConfigManager;
 import network.WebHookHandler;
 
@@ -20,6 +21,9 @@ public class DashboardFrame extends JFrame {
     private JTextField  urlField;
     private JLabel      leaveStatusLabel;
     private JLabel      countdownLabel;
+    private JLabel      activeCoinLabel;
+    private JLabel      activeComboLabel;
+    private JLabel      activeNextRewardLabel;
     private Timer       countdownTimer;
     private StatsTab    statsTab;
     private JButton     phoneToggleBtn;
@@ -272,7 +276,15 @@ public class DashboardFrame extends JFrame {
         controlBtns.add(endBtn);
         leavePanel.add(controlBtns, BorderLayout.SOUTH);
 
-        panel.add(leavePanel, BorderLayout.SOUTH);
+        JPanel southStack = new JPanel();
+        southStack.setLayout(new BoxLayout(southStack, BoxLayout.Y_AXIS));
+        leavePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        southStack.add(leavePanel);
+        southStack.add(Box.createVerticalStrut(4));
+        JPanel coinPanel = buildActiveCoinPanel();
+        coinPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        southStack.add(coinPanel);
+        panel.add(southStack, BorderLayout.SOUTH);
         return panel;
     }
 
@@ -293,5 +305,75 @@ public class DashboardFrame extends JFrame {
             countdownLabel.setText(" ");
             leaveStatusLabel.setText("狀態：專注中");
         }
+        if (activeCoinLabel != null) {
+            activeCoinLabel.setText(root.getCoinManager().getCoins() + " 枚");
+            activeComboLabel.setText(root.getCoinManager().getCombo() + "x");
+            activeNextRewardLabel.setText("+" + root.getCoinManager().getNextReward() + " 枚");
+        }
+    }
+
+    // ── 專注中金幣儀表板 ──────────────────────────
+    private JPanel buildActiveCoinPanel() {
+        JPanel panel = new JPanel(new BorderLayout(0, 4));
+        panel.setBorder(BorderFactory.createTitledBorder("專注金幣"));
+
+        JPanel cards = new JPanel(new GridLayout(1, 3, 6, 0));
+        cards.setOpaque(false);
+
+        activeCoinLabel = new JLabel(root.getCoinManager().getCoins() + " 枚", SwingConstants.CENTER);
+        activeCoinLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        activeCoinLabel.setForeground(new Color(180, 120, 0));
+
+        activeComboLabel = new JLabel(root.getCoinManager().getCombo() + "x", SwingConstants.CENTER);
+        activeComboLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        activeComboLabel.setForeground(new Color(210, 70, 0));
+
+        activeNextRewardLabel = new JLabel("+" + root.getCoinManager().getNextReward() + " 枚", SwingConstants.CENTER);
+        activeNextRewardLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 16));
+        activeNextRewardLabel.setForeground(new Color(0, 140, 80));
+
+        cards.add(makeCoinCard("💰 金幣餘額",    activeCoinLabel));
+        cards.add(makeCoinCard("⚡ 專注回饋倍率", activeComboLabel));
+        cards.add(makeCoinCard("🎁 下次獎勵",    activeNextRewardLabel));
+        panel.add(cards, BorderLayout.CENTER);
+
+        JButton buyBtn = new JButton(
+            "購買 10 分鐘放鬆通行證（需要 " + CoinManager.RELAX_PASS_COST + " 枚金幣）");
+        buyBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
+        buyBtn.addActionListener(e -> {
+            // 先檢查冷卻：上一張通行證是否還未過期
+            long remaining = root.getRelaxPassRemainingMs();
+            if (remaining > 0) {
+                long secs = remaining / 1000;
+                JOptionPane.showMessageDialog(this,
+                    "通行證尚未過期！還有 " + String.format("%02d:%02d", secs / 60, secs % 60)
+                    + " 後才能再購買。");
+                return;
+            }
+            if (!root.purchaseRelaxPass()) {
+                JOptionPane.showMessageDialog(this,
+                    "金幣不足！需要 " + CoinManager.RELAX_PASS_COST
+                    + " 枚，目前只有 " + root.getCoinManager().getCoins() + " 枚。");
+                return;
+            }
+            activeCoinLabel.setText(root.getCoinManager().getCoins() + " 枚");
+            JOptionPane.showMessageDialog(this, "已購買！享受你的 10 分鐘放鬆時光～");
+        });
+        panel.add(buyBtn, BorderLayout.SOUTH);
+        return panel;
+    }
+
+    private JPanel makeCoinCard(String title, JLabel value) {
+        JPanel card = new JPanel(new BorderLayout(0, 2));
+        card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 215, 240)),
+            BorderFactory.createEmptyBorder(4, 4, 4, 4)));
+        card.setBackground(new Color(245, 248, 255));
+        JLabel titleLbl = new JLabel(title, SwingConstants.CENTER);
+        titleLbl.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 10));
+        titleLbl.setForeground(Color.GRAY);
+        card.add(titleLbl, BorderLayout.NORTH);
+        card.add(value,    BorderLayout.CENTER);
+        return card;
     }
 }
