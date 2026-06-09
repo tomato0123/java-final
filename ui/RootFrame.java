@@ -32,10 +32,9 @@ public class RootFrame extends JFrame {
     private FocusStatsManager statsManager      = new FocusStatsManager();
     private boolean           phoneMonitorActive    = false;
     private String            currentFocusTask      = null;
-    private CoinManager       coinManager;
     private Timer             pomodoroCheckTimer    = null;
     private int               lastPomodoroMilestone = 0;
-    private long              relaxPassExpiry       = 0; // 通行證時效到期時間戳
+    private long              relaxPassExpiry       = 0;
 
     // ── 透明淡出 ──────────────────────────────────
     private volatile float petOpacity      = 1.0f;
@@ -296,22 +295,6 @@ public class RootFrame extends JFrame {
         isFocusActive      = false;
         currentFocusTask   = null;
 
-        // Award coins if at least one pomodoro duration was completed
-        int coinsEarned = 0;
-        if (sessionStart > 0) {
-            int pomMin = ConfigManager.getPomodoroDuration();
-            if (pomMin == 0) pomMin = 25;
-            if (System.currentTimeMillis() - sessionStart >= (long) pomMin * 60_000) {
-                coinsEarned = CoinManager.BASE_REWARD * coinManager.getCombo();
-                coinManager.onPomodoroCompleted();
-                int earned = coinsEarned;
-                ToastNotification.show(
-                    "獲得專注金幣！",
-                    "本次獲得 " + earned + " 枚！目前共 " + coinManager.getCoins() + " 枚",
-                    () -> {}, () -> {}
-                );
-            }
-        }
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
         if (moveTimer       != null) { moveTimer.stop(); moveTimer = null; }
@@ -323,11 +306,7 @@ public class RootFrame extends JFrame {
         if (localServer     != null) localServer.stop();
         if (dashboardFrame  != null && dashboardFrame.isDisplayable())
             dashboardFrame.onFocusStopped();
-        if (coinsEarned > 0) {
-            petPanel.setState("happy", "太棒了！獲得 " + coinsEarned + " 枚金幣！辛苦了！");
-        } else {
-            petPanel.setState("normal", "專注結束！辛苦了！");
-        }
+        petPanel.setState("normal", "專注結束！辛苦了！");
 
         // 3 秒後縮回工作列
         new Timer(3000, e -> { hideToTray(); ((Timer) e.getSource()).stop(); }).start();

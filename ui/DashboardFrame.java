@@ -288,16 +288,22 @@ public class DashboardFrame extends JFrame {
         controlBtns.add(endBtn);
         leavePanel.add(controlBtns, BorderLayout.SOUTH);
 
-        JPanel southStack = new JPanel();
-        southStack.setLayout(new BoxLayout(southStack, BoxLayout.Y_AXIS));
-        leavePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        southStack.add(leavePanel);
-        southStack.add(Box.createVerticalStrut(4));
-        JPanel coinPanel = buildActiveCoinPanel();
-        coinPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        southStack.add(coinPanel);
-        panel.add(southStack, BorderLayout.SOUTH);
-        return panel;
+        content.add(leavePanel);
+
+        // NORTH 讓 content 維持 preferred height，視窗縮短時捲軸才會正確出現
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.add(content, BorderLayout.NORTH);
+
+        JScrollPane scrollPane = new JScrollPane(outer,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.add(scrollPane, BorderLayout.CENTER);
+        return wrapper;
     }
 
     private void updateCountdown() {
@@ -387,5 +393,20 @@ public class DashboardFrame extends JFrame {
         card.add(titleLbl, BorderLayout.NORTH);
         card.add(value,    BorderLayout.CENTER);
         return card;
+    }
+
+    private JScrollPane wrapInScroll(JComponent content) {
+        // 放在 NORTH 確保 content 維持自身 preferred height，
+        // 而不是隨 viewport 縮小 → 視窗縮短時上下捲軸才會正確出現
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.add(content, BorderLayout.NORTH);
+
+        JScrollPane sp = new JScrollPane(outer,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        sp.setBorder(null);
+        sp.getVerticalScrollBar().setUnitIncrement(16);
+        sp.getHorizontalScrollBar().setUnitIncrement(16);
+        return sp;
     }
 }
