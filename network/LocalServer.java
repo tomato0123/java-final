@@ -81,12 +81,12 @@ public class LocalServer {
             "#leave-over{margin-top:14px;padding:10px 18px;background:#2a0a0a;" +
             "border-radius:12px;color:#ff6b6b;font-size:1em;display:none}" +
             "</style></head><body>" +
-            "<h1>🎯 專注計時器</h1>" +
+            "<h1>專注計時器</h1>" +
             "<div id='timer'>00:00</div>" +
-            "<div id='status'>✅ 保持此頁面在前台</div>" +
-            "<div id='warn'>⚠️ 離開偵測！訊號已送出！</div>" +
+            "<div id='status'>保持此頁面在前台</div>" +
+            "<div id='warn'>離開偵測！訊號已送出！</div>" +
             "<div class='leave-section'>" +
-            "  <div class='leave-title'>📱 手機請假（短暫離開用）</div>" +
+            "  <div class='leave-title'>手機請假（短暫離開用）</div>" +
             "  <div id='leave-btns' class='leave-grid'>" +
             "    <button class='leave-btn' onclick='applyLeave(1)'>1 分鐘</button>" +
             "    <button class='leave-btn' onclick='applyLeave(3)'>3 分鐘</button>" +
@@ -94,10 +94,10 @@ public class LocalServer {
             "    <button class='leave-btn' onclick='applyLeave(10)'>10 分鐘</button>" +
             "  </div>" +
             "  <div id='leave-active'>" +
-            "    <div id='leave-msg'>🏖️ 請假中，放鬆一下！</div>" +
+            "    <div id='leave-msg'>請假中，放鬆一下！</div>" +
             "    <div id='leave-countdown'>00:00</div>" +
             "  </div>" +
-            "  <div id='leave-over'>⏰ 請假時間到！快回來！</div>" +
+            "  <div id='leave-over'>請假時間到！快回來！</div>" +
             "</div>" +
             "<script>" +
             "var start=Date.now();" +
