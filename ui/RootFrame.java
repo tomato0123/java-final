@@ -23,6 +23,7 @@ public class RootFrame extends JFrame {
     private ReminderManager  reminderManager;
     private BlacklistManager blacklistManager;
     private TodoManager      todoManager;
+    private CoinManager      coinManager;
     private WebHookHandler   webhookHandler;
     private LocalServer      localServer;
     private DashboardFrame   dashboardFrame;
@@ -294,6 +295,23 @@ public class RootFrame extends JFrame {
         phoneMonitorActive = false;
         isFocusActive      = false;
         currentFocusTask   = null;
+
+        // Award coins if at least one pomodoro duration was completed
+        int coinsEarned = 0;
+        if (sessionStart > 0) {
+            int pomMin = ConfigManager.getPomodoroDuration();
+            if (pomMin == 0) pomMin = 25;
+            if (System.currentTimeMillis() - sessionStart >= (long) pomMin * 60_000) {
+                coinsEarned = CoinManager.BASE_REWARD * coinManager.getCombo();
+                coinManager.onPomodoroCompleted();
+                int earned = coinsEarned;
+                ToastNotification.show(
+                    "獲得專注金幣！",
+                    "本次獲得 " + earned + " 枚！目前共 " + coinManager.getCoins() + " 枚",
+                    () -> {}, () -> {}
+                );
+            }
+        }
         if (inactivityTimer != null) inactivityTimer.stop();
         if (fadeTimer       != null) fadeTimer.stop();
         if (moveTimer       != null) { moveTimer.stop(); moveTimer = null; }
@@ -305,7 +323,11 @@ public class RootFrame extends JFrame {
         if (localServer     != null) localServer.stop();
         if (dashboardFrame  != null && dashboardFrame.isDisplayable())
             dashboardFrame.onFocusStopped();
-        petPanel.setState("normal", "專注結束！辛苦了！");
+        if (coinsEarned > 0) {
+            petPanel.setState("happy", "太棒了！獲得 " + coinsEarned + " 枚金幣！辛苦了！");
+        } else {
+            petPanel.setState("normal", "專注結束！辛苦了！");
+        }
 
         // 3 秒後縮回工作列
         new Timer(3000, e -> { hideToTray(); ((Timer) e.getSource()).stop(); }).start();
