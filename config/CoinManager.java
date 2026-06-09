@@ -4,29 +4,29 @@ import java.io.*;
 import java.util.Properties;
 
 public class CoinManager {
-    public static final int BASE_REWARD     = 50;   // coins per pomodoro at 1x
-    public static final int RELAX_PASS_COST = 200;  // coins to buy 10-min relax pass
+    public static final int BASE_REWARD     = 50;
+    public static final int RELAX_PASS_COST = 200;
 
     private static final String FILE = "coins.properties";
 
     private int coins = 0;
-    private int combo = 1;  // starts at 1x, increments with each successful pomodoro
+    private int combo = 1;
 
     public CoinManager() { load(); }
 
-    /** Call when a full pomodoro session ends without a forced break. */
+    /** 每完成一個番茄鐘呼叫：依目前倍率發幣，然後 combo++。 */
     public void onPomodoroCompleted() {
         coins += BASE_REWARD * combo;
         combo++;
         save();
     }
 
-    /** Resets combo to 1x (called on distraction or phone violation). */
+    /** 分心或手機違規時重設連擊倍率為 1x。 */
     public void breakCombo() {
         if (combo > 1) { combo = 1; save(); }
     }
 
-    /** Deducts coins. Returns false if balance is insufficient. */
+    /** 扣除金幣。餘額不足回傳 false。 */
     public boolean spendCoins(int amount) {
         if (coins < amount) return false;
         coins -= amount;
@@ -52,7 +52,7 @@ public class CoinManager {
     private void save() {
         Properties p = new Properties();
         p.setProperty("coins", String.valueOf(coins));
-        p.setProperty("combo", String.valueOf(combo));
+        p.setProperty("combo",  String.valueOf(combo));
         try (OutputStream out = new FileOutputStream(FILE)) {
             p.store(out, null);
         } catch (IOException ignored) {}

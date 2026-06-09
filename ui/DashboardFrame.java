@@ -287,19 +287,17 @@ public class DashboardFrame extends JFrame {
         controlBtns.add(phoneToggleBtn);
         controlBtns.add(endBtn);
         leavePanel.add(controlBtns, BorderLayout.SOUTH);
-        content.add(leavePanel);
 
-        // ── 整個 active card 包進 JScrollPane ──
-        JScrollPane scrollPane = new JScrollPane(content,
-            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setBorder(null);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
-        scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
-
-        JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.add(scrollPane, BorderLayout.CENTER);
-        return wrapper;
+        JPanel southStack = new JPanel();
+        southStack.setLayout(new BoxLayout(southStack, BoxLayout.Y_AXIS));
+        leavePanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        southStack.add(leavePanel);
+        southStack.add(Box.createVerticalStrut(4));
+        JPanel coinPanel = buildActiveCoinPanel();
+        coinPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        southStack.add(coinPanel);
+        panel.add(southStack, BorderLayout.SOUTH);
+        return panel;
     }
 
     private void updateCountdown() {
@@ -319,7 +317,6 @@ public class DashboardFrame extends JFrame {
             countdownLabel.setText(" ");
             leaveStatusLabel.setText("狀態：專注中");
         }
-        // 同步更新金幣三欄
         if (activeCoinLabel != null) {
             activeCoinLabel.setText(root.getCoinManager().getCoins() + " 枚");
             activeComboLabel.setText(root.getCoinManager().getCombo() + "x");
@@ -327,7 +324,7 @@ public class DashboardFrame extends JFrame {
         }
     }
 
-    // ── 專注中金幣儀表板（active card 內）──────────
+    // ── 專注中金幣儀表板 ──────────────────────────
     private JPanel buildActiveCoinPanel() {
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.setBorder(BorderFactory.createTitledBorder("專注金幣"));
@@ -356,6 +353,15 @@ public class DashboardFrame extends JFrame {
             "購買 10 分鐘放鬆通行證（需要 " + CoinManager.RELAX_PASS_COST + " 枚金幣）");
         buyBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
         buyBtn.addActionListener(e -> {
+            // 先檢查冷卻：上一張通行證是否還未過期
+            long remaining = root.getRelaxPassRemainingMs();
+            if (remaining > 0) {
+                long secs = remaining / 1000;
+                JOptionPane.showMessageDialog(this,
+                    "通行證尚未過期！還有 " + String.format("%02d:%02d", secs / 60, secs % 60)
+                    + " 後才能再購買。");
+                return;
+            }
             if (!root.purchaseRelaxPass()) {
                 JOptionPane.showMessageDialog(this,
                     "金幣不足！需要 " + CoinManager.RELAX_PASS_COST
@@ -366,7 +372,6 @@ public class DashboardFrame extends JFrame {
             JOptionPane.showMessageDialog(this, "已購買！享受你的 10 分鐘放鬆時光～");
         });
         panel.add(buyBtn, BorderLayout.SOUTH);
-
         return panel;
     }
 
@@ -380,17 +385,7 @@ public class DashboardFrame extends JFrame {
         titleLbl.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 10));
         titleLbl.setForeground(Color.GRAY);
         card.add(titleLbl, BorderLayout.NORTH);
-        card.add(value, BorderLayout.CENTER);
+        card.add(value,    BorderLayout.CENTER);
         return card;
-    }
-
-    private JScrollPane wrapInScroll(JComponent content) {
-        JScrollPane sp = new JScrollPane(content,
-            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        sp.setBorder(null);
-        sp.getVerticalScrollBar().setUnitIncrement(16);
-        sp.getHorizontalScrollBar().setUnitIncrement(16);
-        return sp;
     }
 }

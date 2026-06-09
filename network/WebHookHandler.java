@@ -20,7 +20,6 @@ public class WebHookHandler implements HttpHandler {
         this.pet = pet;
     }
 
-    /** Called by RootFrame after construction to wire the combo-break callback. */
     public void setOnComboBreak(Runnable callback) {
         this.onComboBreak = callback;
     }
@@ -77,6 +76,11 @@ public class WebHookHandler implements HttpHandler {
                     if (leaveExpiryTimer != null) leaveExpiryTimer.stop();
                 }
             });
+        } else if (query != null && query.startsWith("leave=")) {
+            try {
+                int min = Integer.parseInt(query.substring(6).trim());
+                if (min >= 1 && min <= 60) applyForLeave(min);
+            } catch (NumberFormatException ignored) {}
         }
 
         exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");

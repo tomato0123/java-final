@@ -30,8 +30,12 @@ public class RootFrame extends JFrame {
     private boolean           isFocusActive     = false;
     private long              focusStartTime    = 0;
     private FocusStatsManager statsManager      = new FocusStatsManager();
-    private boolean           phoneMonitorActive = false;
-    private String            currentFocusTask  = null; // null = no task selected
+    private boolean           phoneMonitorActive    = false;
+    private String            currentFocusTask      = null;
+    private CoinManager       coinManager;
+    private Timer             pomodoroCheckTimer    = null;
+    private int               lastPomodoroMilestone = 0;
+    private long              relaxPassExpiry       = 0; // 通行證時效到期時間戳
 
     // ── 透明淡出 ──────────────────────────────────
     private volatile float petOpacity      = 1.0f;
@@ -254,9 +258,12 @@ public class RootFrame extends JFrame {
             currentFocusTask = taskDialog.getSelectedTitle();
 
             try {
-                isFocusActive      = true;
-                focusStartTime     = System.currentTimeMillis();
+                isFocusActive         = true;
+                focusStartTime        = System.currentTimeMillis();
+                lastPomodoroMilestone = 0;
                 statsManager.onFocusStart();
+                pomodoroCheckTimer = new Timer(10_000, e -> checkPomodoroMilestone());
+                pomodoroCheckTimer.start();
                 petOpacity         = 1.0f;
                 String url         = localServer.start();
                 phoneMonitorActive = true;
@@ -280,7 +287,9 @@ public class RootFrame extends JFrame {
     }
 
     public void stopFocusSession() {
-        long sessionStart  = focusStartTime; // capture before reset
+        checkPomodoroMilestone(); // 確保最後一個番茄鐘不漏
+        if (pomodoroCheckTimer != null) { pomodoroCheckTimer.stop(); pomodoroCheckTimer = null; }
+        lastPomodoroMilestone = 0;
         statsManager.onFocusEnd();
         focusStartTime     = 0;
         phoneMonitorActive = false;
@@ -324,6 +333,49 @@ public class RootFrame extends JFrame {
         new Timer(3000, e -> { hideToTray(); ((Timer) e.getSource()).stop(); }).start();
     }
 
+    /** 每 10 秒自動檢查，達到番茄鐘里程碑時立即發幣並通知。 */
+    private void checkPomodoroMilestone() {
+        if (!isFocusActive || focusStartTime == 0) return;
+        int pomMin = ConfigManager.getPomodoroDuration();
+        if (pomMin <= 0) pomMin = 25;
+        long elapsed   = System.currentTimeMillis() - focusStartTime;
+        int  completed = (int)(elapsed / ((long) pomMin * 60_000));
+        while (lastPomodoroMilestone < completed) {
+            lastPomodoroMilestone++;
+            int earned = CoinManager.BASE_REWARD * coinManager.getCombo();
+            coinManager.onPomodoroCompleted();
+            String task = currentFocusTask;
+            String msg  = task != null
+                ? "第 " + lastPomodoroMilestone + " 個番茄鐘！獲得 " + earned + " 枚！繼續完成『" + task + "』！"
+                : "第 " + lastPomodoroMilestone + " 個番茄鐘完成！獲得 " + earned + " 枚金幣！繼續加油！";
+            petPanel.setState("happy", msg);
+            ToastNotification.show(
+                "番茄鐘完成！獲得 " + earned + " 枚金幣",
+                "目前共 " + coinManager.getCoins() + " 枚，連擊 " + coinManager.getCombo() + "x",
+                () -> {}, () -> {}
+            );
+        }
+    }
+
+    /**
+     * 購買 10 分鐘放鬆通行證。
+     * 回傳 false 代表：金幣不足，或上一張通行證尚未過期。
+     */
+    public boolean purchaseRelaxPass() {
+        if (System.currentTimeMillis() < relaxPassExpiry) return false; // 冷卻中
+        if (!coinManager.spendCoins(CoinManager.RELAX_PASS_COST)) return false;
+        relaxPassExpiry = System.currentTimeMillis() + 10L * 60_000;
+        applyForLeave(10);
+        blacklistManager.startResearchMode(10);
+        return true;
+    }
+
+    /** 回傳目前通行證剩餘毫秒數；若已過期回傳 0。 */
+    public long getRelaxPassRemainingMs() {
+        long rem = relaxPassExpiry - System.currentTimeMillis();
+        return rem > 0 ? rem : 0;
+    }
+
     public void applyForLeave(int minutes) {
         if (webhookHandler != null) webhookHandler.applyForLeave(minutes);
     }
@@ -335,13 +387,6 @@ public class RootFrame extends JFrame {
         this.webhookHandler = wh;
         this.localServer    = ls;
         wh.setOnComboBreak(() -> coinManager.breakCombo());
-    }
-
-    /** Spends coins and grants a 10-minute relax leave. Returns false if coins are insufficient. */
-    public boolean purchaseRelaxPass() {
-        if (!coinManager.spendCoins(CoinManager.RELAX_PASS_COST)) return false;
-        applyForLeave(10);
-        return true;
     }
 
     public PetPanel          getPetPanel()          { return petPanel; }
