@@ -104,6 +104,22 @@ public class StatsTab extends JPanel {
     }
 
     // ════════════════════════════════════════════
+    //  專注金幣儀表板
+    // ════════════════════════════════════════════
+    private JPanel buildCoinSection() {
+        JPanel panel = new JPanel(new BorderLayout(0, 6));
+        panel.setBorder(BorderFactory.createTitledBorder("專注金幣"));
+        panel.setOpaque(false);
+
+        coinsLabel = new JLabel("0 枚", SwingConstants.CENTER);
+        coinsLabel.setFont(new Font("Microsoft JhengHei", Font.BOLD, 22));
+        coinsLabel.setForeground(new Color(180, 120, 0));
+        panel.add(makeCard("💰 金幣餘額", coinsLabel), BorderLayout.CENTER);
+
+        return panel;
+    }
+
+    // ════════════════════════════════════════════
     //  近 7 日走勢圖
     // ════════════════════════════════════════════
     private JPanel buildChartSection() {

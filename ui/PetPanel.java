@@ -26,6 +26,7 @@ public class PetPanel extends JPanel {
     private BufferedImage[] sleepFrames      = new BufferedImage[8];
     private BufferedImage[] walkRightFrames  = new BufferedImage[8];
     private BufferedImage[] walkLeftFrames   = new BufferedImage[8];
+    private BufferedImage[] angryFrames      = new BufferedImage[8];
 
     private int     currentFrameIndex = 0;
     private Timer   animationTimer;
@@ -213,6 +214,7 @@ public class PetPanel extends JPanel {
                 sleepFrames[i]     = ImageIO.read(new File(folder + prefix + "sleep"  + (i+1) + ".png"));
                 walkRightFrames[i] = ImageIO.read(new File(folder + prefix + "walkR"  + (i+1) + ".png"));
                 walkLeftFrames[i]  = ImageIO.read(new File(folder + prefix + "walkL"  + (i+1) + ".png"));
+                angryFrames[i]     = ImageIO.read(new File(folder + prefix + "angry"  + (i+1) + ".png"));
             }
         } catch (IOException e) {
             System.err.println("載入圖片失敗（" + currentPetType + "）: " + e.getMessage());
@@ -229,7 +231,7 @@ public class PetPanel extends JPanel {
             currentFrameIndex = 0;
         }
 
-        if ("happy".equals(currentState) || "sleep".equals(currentState)) {
+        if ("happy".equals(currentState) || "sleep".equals(currentState) || "angry".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
         } else if ("normal".equals(currentState)) {
             currentFrameIndex = (currentFrameIndex + 1) % 8;
@@ -277,6 +279,8 @@ public class PetPanel extends JPanel {
             currentImage = walkLeftFrames[currentFrameIndex];
         else if ("walk_right".equals(currentState) && walkRightFrames[currentFrameIndex] != null)
             currentImage = walkRightFrames[currentFrameIndex];
+        else if ("angry".equals(currentState)      && angryFrames[currentFrameIndex]     != null)
+            currentImage = angryFrames[currentFrameIndex];
 
         if (currentImage != null) {
             int drawX = (300 - currentImage.getWidth())  / 2;
