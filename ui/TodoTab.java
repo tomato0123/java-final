@@ -95,8 +95,12 @@ public class TodoTab extends JPanel {
         JPanel wrapper = new JPanel(new BorderLayout(0, 4));
         listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
-        JScrollPane scroll = new JScrollPane(listPanel);
+        JScrollPane scroll = new JScrollPane(listPanel,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+            JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(BorderFactory.createTitledBorder("待辦清單"));
+        scroll.setPreferredSize(new Dimension(300, 420));
+        scroll.getVerticalScrollBar().setUnitIncrement(20);
         wrapper.add(scroll, BorderLayout.CENTER);
 
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
@@ -167,13 +171,14 @@ public class TodoTab extends JPanel {
             && item.getDueDateTime().isBefore(LocalDateTime.now());
 
         JPanel row = new JPanel(new BorderLayout(6, 0));
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 56));
+        row.setMinimumSize(new Dimension(0, 56));
         row.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 4, 0, 0,
+            BorderFactory.createMatteBorder(0, 5, 0, 0,
                 item.isCompleted() ? Color.LIGHT_GRAY
                     : overdue       ? new Color(200, 50, 50)
                     : new Color(60, 130, 240)),
-            BorderFactory.createEmptyBorder(4, 8, 4, 6)));
+            BorderFactory.createEmptyBorder(8, 10, 8, 8)));
         row.setBackground(item.isCompleted() ? new Color(242, 242, 242) : Color.WHITE);
 
         // 左：勾選框
@@ -185,19 +190,19 @@ public class TodoTab extends JPanel {
 
         // 中：名稱 + 截止時間
         JLabel titleLbl = new JLabel(item.getTitle());
-        titleLbl.setFont(new Font("Microsoft JhengHei", Font.BOLD, 13));
+        titleLbl.setFont(new Font("Microsoft JhengHei", Font.BOLD, 15));
         if (item.isCompleted()) titleLbl.setForeground(new Color(160, 160, 160));
         else if (overdue)       titleLbl.setForeground(new Color(200, 50, 50));
 
-        JPanel center = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JPanel center = new JPanel(new BorderLayout(4, 2));
         center.setOpaque(false);
-        center.add(titleLbl);
+        center.add(titleLbl, BorderLayout.NORTH);
         if (item.getDueDateTime() != null) {
             boolean near = item.getDueDateTime().isBefore(LocalDateTime.now().plusDays(2));
             JLabel dtLbl = new JLabel(item.getDueDateTime().format(near ? DT_NEAR : DT_FAR));
-            dtLbl.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
+            dtLbl.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
             dtLbl.setForeground(overdue ? new Color(200, 50, 50) : Color.GRAY);
-            center.add(dtLbl);
+            center.add(dtLbl, BorderLayout.SOUTH);
         }
         row.add(center, BorderLayout.CENTER);
 
@@ -206,13 +211,13 @@ public class TodoTab extends JPanel {
         btns.setOpaque(false);
         if (!item.isCompleted()) {
             JButton editBtn = new JButton("編輯");
-            editBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 11));
+            editBtn.setFont(new Font("Microsoft JhengHei", Font.PLAIN, 12));
             editBtn.addActionListener(e -> openEditDialog(item));
             btns.add(editBtn);
         }
         JButton delBtn = new JButton("✕");
-        delBtn.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
-        delBtn.setMargin(new Insets(0, 4, 0, 4));
+        delBtn.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        delBtn.setMargin(new Insets(2, 6, 2, 6));
         delBtn.addActionListener(e -> {
             int confirm = JOptionPane.showConfirmDialog(this,
                 "確定要刪除「" + item.getTitle() + "」嗎？", "確認刪除", JOptionPane.YES_NO_OPTION);
